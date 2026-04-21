@@ -83,9 +83,10 @@ Follow this recipe verbatim for a single-app build.
 7. \`app/globals.css\`: \`@tailwind base;\n@tailwind components;\n@tailwind utilities;\`
 8. \`app/layout.tsx\`: minimal RootLayout importing \`./globals.css\`, with \`<html lang="en"><body>{children}</body></html>\`.
 9. \`app/page.tsx\`: the actual landing page — real, generous content (hero, features, CTA, footer). NOT placeholder text.
-10. \`exec\`: \`bun install\` (fallback: \`pnpm install --no-frozen-lockfile\`).
-11. \`exec\`: \`bun run dev > /tmp/dev.log 2>&1 &\` — background-spawn so exec doesn't time out.
-12. \`exec\`: \`for i in 1 2 3 4 5; do sleep 2; curl -sI http://localhost:3000 2>/dev/null | head -1 && break; done\` — retries up to 5 times (Next's cold compile can take 10s).
+10. \`.gitignore\` at root containing at minimum: \`node_modules/\`, \`.next/\`, \`dist/\`, \`.env\`, \`.env.local\`, \`*.log\`, \`.DS_Store\`. This is required — without it, "Push to GitHub" times out because git tries to push 500 MB of node_modules.
+11. \`exec\`: \`bun install\` (fallback: \`pnpm install --no-frozen-lockfile\`).
+12. \`exec\`: \`bun run dev > /tmp/dev.log 2>&1 &\` — background-spawn so exec doesn't time out.
+13. \`exec\`: \`for i in 1 2 3 4 5; do sleep 2; curl -sI http://localhost:3000 2>/dev/null | head -1 && break; done\` — retries up to 5 times (Next's cold compile can take 10s).
 
 If step 12 returns \`HTTP/1.1 200\`, the live preview iframe in the user's browser will render the page. If it returns 500 or never returns 200, read \`/tmp/dev.log\` with \`exec: cat /tmp/dev.log\`, diagnose, and fix.
 

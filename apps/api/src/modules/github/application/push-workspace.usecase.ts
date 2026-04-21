@@ -59,12 +59,41 @@ export class PushWorkspaceUseCase {
     const escapedMsg = message.replace(/"/g, '\\"');
     const remoteUrl = `https://x-access-token:${integration.accessToken}@github.com/${owner}/${repoName}.git`;
 
+    // Without this .gitignore, `git add -A` snapshots the entire node_modules
+    // tree (200-500 MB) which times out GitHub's push endpoint with HTTP 408.
+    // We only write it if the user's project doesn't already have one.
+    const defaultGitignore = [
+      'node_modules/',
+      '.next/',
+      'dist/',
+      'build/',
+      'out/',
+      'coverage/',
+      '*.tsbuildinfo',
+      '',
+      '.env',
+      '.env.local',
+      '.env.*.local',
+      '',
+      '*.log',
+      '.DS_Store',
+      'Thumbs.db',
+      '',
+      '.turbo/',
+      '.cache/',
+    ].join('\\n');
+
     const script = [
       'set -e',
       'cd /home/workspace/project',
+      `[ -f .gitignore ] || printf '%b' "${defaultGitignore}" > .gitignore`,
       '[ -d .git ] || git init -q',
       'git config user.email "noreply@code.ae"',
       `git config user.name "${integration.githubLogin}"`,
+      // Bump buffer so large legitimate commits don't hit 408 either.
+      'git config http.postBuffer 524288000',
+      // Untrack anything that used to be staged but is now gitignored.
+      'git rm -r --cached --ignore-unmatch -q . >/dev/null 2>&1 || true',
       'git add -A',
       `(git diff --cached --quiet || git commit -q -m "${escapedMsg}")`,
       '(git branch -M main 2>/dev/null || true)',
@@ -75,7 +104,7 @@ export class PushWorkspaceUseCase {
     const result = await this.exec.execute(input.projectId, input.ownerId, {
       command: script,
       cwd: '/home/workspace/project',
-      timeoutMs: 180_000,
+      timeoutMs: 300_000,
     });
 
     if (result.exitCode !== 0) {
