@@ -18,6 +18,7 @@ export class PrismaMessageRepository extends MessageRepository {
         role: m.role,
         content: m.content,
         ...(m.toolCalls ? { toolCalls: m.toolCalls as unknown as object } : {}),
+        ...(m.toolCallId ? { toolCallId: m.toolCallId } : {}),
       },
     });
   }
@@ -35,7 +36,7 @@ export class PrismaMessageRepository extends MessageRepository {
         role: r.role as MessageRole,
         content: r.content,
         toolCalls: (r.toolCalls as unknown as MessageToolCall[] | null) ?? null,
-        toolCallId: null,
+        toolCallId: r.toolCallId,
         createdAt: r.createdAt,
       }),
     );
