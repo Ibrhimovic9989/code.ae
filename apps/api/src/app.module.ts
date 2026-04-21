@@ -6,6 +6,7 @@ import { ProjectsModule } from './modules/projects/projects.module';
 import { SessionsModule } from './modules/sessions/sessions.module';
 import { SandboxesModule } from './modules/sandboxes/sandboxes.module';
 import { SecretsModule } from './modules/secrets/secrets.module';
+import { WorkspaceModule } from './modules/workspace/workspace.module';
 import { PrismaModule } from './infrastructure/prisma/prisma.module';
 import { appConfigSchema } from './config/app.config';
 
@@ -23,6 +24,7 @@ import { appConfigSchema } from './config/app.config';
     SessionsModule,
     SandboxesModule,
     SecretsModule,
+    WorkspaceModule,
   ],
 })
 export class AppModule {}
