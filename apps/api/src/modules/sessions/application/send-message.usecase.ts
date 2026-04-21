@@ -29,7 +29,7 @@ export class SendMessageUseCase {
   private readonly apiKey: string;
   private readonly deployment: string;
   private readonly apiVersion: string;
-  private readonly maxTurns = 8;
+  private readonly maxTurns = 20;
 
   constructor(
     private readonly projects: ProjectRepository,
