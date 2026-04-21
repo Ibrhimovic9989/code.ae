@@ -9,6 +9,8 @@ export interface ProjectProps {
   template: ProjectTemplate;
   visibility: ProjectVisibility;
   githubRepoUrl: string | null;
+  vercelProjectId: string | null;
+  vercelDeploymentUrl: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -40,6 +42,12 @@ export class ProjectEntity {
 
   linkGithub(repoUrl: string): void {
     this.props.githubRepoUrl = repoUrl;
+    this.props.updatedAt = new Date();
+  }
+
+  linkVercel(vercelProjectId: string, deploymentUrl: string): void {
+    this.props.vercelProjectId = vercelProjectId;
+    this.props.vercelDeploymentUrl = deploymentUrl;
     this.props.updatedAt = new Date();
   }
 

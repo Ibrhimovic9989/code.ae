@@ -9,6 +9,7 @@ import { SecretsModule } from './modules/secrets/secrets.module';
 import { WorkspaceModule } from './modules/workspace/workspace.module';
 import { GitHubModule } from './modules/github/github.module';
 import { McpModule } from './modules/mcp/mcp.module';
+import { VercelModule } from './modules/vercel/vercel.module';
 import { PrismaModule } from './infrastructure/prisma/prisma.module';
 import { appConfigSchema } from './config/app.config';
 
@@ -29,6 +30,7 @@ import { appConfigSchema } from './config/app.config';
     WorkspaceModule,
     GitHubModule,
     McpModule,
+    VercelModule,
   ],
 })
 export class AppModule {}

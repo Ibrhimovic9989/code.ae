@@ -21,6 +21,7 @@ model User {
   projects      Project[]
   refreshTokens RefreshToken[]
   github        GitHubIntegration?
+  vercel        VercelIntegration?
 }
 
 model GitHubIntegration {
@@ -33,6 +34,18 @@ model GitHubIntegration {
   scopes      String   @default("repo")
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+}
+
+model VercelIntegration {
+  id             String   @id @default(uuid()) @db.Uuid
+  userId         String   @unique @db.Uuid
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken    String
+  vercelUserId   String
+  vercelUsername String
+  teamId         String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 }
 
 model RefreshToken {
@@ -61,6 +74,8 @@ model Project {
   template      String
   visibility    String    @default("private")
   githubRepoUrl String?
+  vercelProjectId     String?
+  vercelDeploymentUrl String?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
   sessions      Session[]

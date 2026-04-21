@@ -161,6 +161,35 @@ class ApiClient {
     return this.request(`/projects/${projectId}/github/push`, { method: 'POST', body: input });
   }
 
+  async getVercelIntegration(): Promise<{
+    integration: { vercelUsername: string; teamId: string | null; connectedAt: string } | null;
+  }> {
+    return this.request('/auth/vercel', { method: 'GET' });
+  }
+
+  async connectVercel(accessToken: string, teamId?: string): Promise<{ integration: { vercelUsername: string } }> {
+    return this.request('/auth/vercel/connect', {
+      method: 'POST',
+      body: { accessToken, ...(teamId ? { teamId } : {}) },
+    });
+  }
+
+  async disconnectVercel(): Promise<void> {
+    await this.request('/auth/vercel', { method: 'DELETE' });
+  }
+
+  async publishProject(
+    projectId: string,
+  ): Promise<{ projectId: string; projectName: string; deploymentId: string; deploymentUrl: string; state: string }> {
+    return this.request(`/projects/${projectId}/publish`, { method: 'POST' });
+  }
+
+  async getLatestDeployment(
+    projectId: string,
+  ): Promise<{ deployment: { uid: string; url: string; state: string; createdAt: number } | null }> {
+    return this.request(`/projects/${projectId}/deployment`, { method: 'GET' });
+  }
+
   streamMessage(
     sessionId: string,
     content: string,

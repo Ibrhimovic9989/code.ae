@@ -13,6 +13,8 @@ type PrismaProjectRow = {
   template: string;
   visibility: string;
   githubRepoUrl: string | null;
+  vercelProjectId: string | null;
+  vercelDeploymentUrl: string | null;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -51,6 +53,8 @@ export class PrismaProjectRepository extends ProjectRepository {
         description: p.description,
         visibility: p.visibility,
         githubRepoUrl: p.githubRepoUrl,
+        vercelProjectId: p.vercelProjectId,
+        vercelDeploymentUrl: p.vercelDeploymentUrl,
         updatedAt: p.updatedAt,
       },
     });
@@ -70,6 +74,8 @@ export class PrismaProjectRepository extends ProjectRepository {
       template: row.template as ProjectTemplate,
       visibility: row.visibility as ProjectVisibility,
       githubRepoUrl: row.githubRepoUrl,
+      vercelProjectId: row.vercelProjectId,
+      vercelDeploymentUrl: row.vercelDeploymentUrl,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
     });

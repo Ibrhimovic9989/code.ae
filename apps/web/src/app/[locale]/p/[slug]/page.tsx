@@ -12,6 +12,7 @@ import { PreviewPanel } from './preview-panel';
 import { TerminalPanel } from './terminal-panel';
 import { SecretsDialog } from './secrets-dialog';
 import { GitHubPushButton } from './github-push-button';
+import { PublishButton } from './publish-button';
 import { useSessionStream } from './use-session-stream';
 
 export default function ProjectWorkspacePage() {
@@ -82,6 +83,7 @@ export default function ProjectWorkspacePage() {
             </span>
             <div className="flex-1" />
             <GitHubPushButton projectId={project?.id ?? null} projectSlug={project?.slug ?? null} />
+            <PublishButton projectId={project?.id ?? null} />
             <Button variant="secondary" onClick={() => setSecretsOpen(true)}>
               {t('workspace.env')}
             </Button>

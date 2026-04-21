@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { Octokit } from 'octokit';
 import { ForbiddenError, NotFoundError, SandboxError, ValidationError } from '@code-ae/shared';
 import { ProjectRepository } from '../../projects/domain/project.repository';
@@ -23,6 +23,8 @@ export interface PushWorkspaceResult {
 
 @Injectable()
 export class PushWorkspaceUseCase {
+  private readonly logger = new Logger(PushWorkspaceUseCase.name);
+
   constructor(
     private readonly projects: ProjectRepository,
     private readonly github: GitHubIntegrationRepository,
@@ -87,18 +89,24 @@ export class PushWorkspaceUseCase {
       'set -e',
       'cd /home/workspace/project',
       `[ -f .gitignore ] || printf '%b' "${defaultGitignore}" > .gitignore`,
-      '[ -d .git ] || git init -q',
+      // Fresh history every time — Code.ae always pushes the current workspace
+      // as a single commit. Avoids OOM when an earlier attempt accidentally
+      // packed node_modules into .git/objects (2 GB sandbox RAM vs git
+      // pack-objects wanting 4+ GB for a large tree).
+      'rm -rf .git',
+      'git init -q',
       'git config user.email "noreply@code.ae"',
       `git config user.name "${integration.githubLogin}"`,
-      // Bump buffer so large legitimate commits don't hit 408 either.
       'git config http.postBuffer 524288000',
-      // Untrack anything that used to be staged but is now gitignored.
-      'git rm -r --cached --ignore-unmatch -q . >/dev/null 2>&1 || true',
+      'git config pack.threads 1',
+      'git config pack.windowMemory 64m',
       'git add -A',
-      `(git diff --cached --quiet || git commit -q -m "${escapedMsg}")`,
-      '(git branch -M main 2>/dev/null || true)',
-      `(git remote set-url origin "${remoteUrl}" 2>/dev/null || git remote add origin "${remoteUrl}")`,
-      'git push -u origin main 2>&1',
+      `git commit -q -m "${escapedMsg}"`,
+      'git branch -M main',
+      `git remote add origin "${remoteUrl}"`,
+      // Force-push because we always rewrite history; GitHub sees it as a
+      // brand-new tree.
+      'git push -u --force origin main 2>&1',
     ].join(' && ');
 
     const result = await this.exec.execute(input.projectId, input.ownerId, {
@@ -108,9 +116,15 @@ export class PushWorkspaceUseCase {
     });
 
     if (result.exitCode !== 0) {
-      throw new SandboxError(
-        `git push failed (exit ${result.exitCode}):\n${result.stderr || result.stdout}`,
+      const combined = (result.stderr || result.stdout || '').replace(
+        new RegExp(integration.accessToken, 'g'),
+        '***',
       );
+      this.logger.error(
+        `git push exit=${result.exitCode} signal=${result.signal} timedOut=${result.timedOut}`,
+      );
+      this.logger.error(combined.slice(-4000));
+      throw new SandboxError(`git push failed (exit ${result.exitCode}):\n${combined}`);
     }
 
     // Persist repo URL on the project

@@ -11,6 +11,12 @@ export class DomainExceptionFilter implements ExceptionFilter {
     const reply = ctx.getResponse<FastifyReply>();
 
     if (exception instanceof DomainError) {
+      if (exception.status >= 500) {
+        this.logger.error(
+          `Domain 5xx: ${exception.code} — ${exception.message}`,
+          exception.stack,
+        );
+      }
       reply.status(exception.status).send({
         error: { code: exception.code, message: exception.message },
       });

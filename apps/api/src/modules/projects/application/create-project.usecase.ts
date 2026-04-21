@@ -28,6 +28,8 @@ export class CreateProjectUseCase {
       template: input.template,
       visibility: input.visibility,
       githubRepoUrl: null,
+      vercelProjectId: null,
+      vercelDeploymentUrl: null,
       createdAt: now,
       updatedAt: now,
     });
