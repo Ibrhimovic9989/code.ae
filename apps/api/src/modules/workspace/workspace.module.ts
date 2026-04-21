@@ -31,5 +31,6 @@ import { WorkspaceController } from './interfaces/http/workspace.controller';
     ExecCommandUseCase,
     StreamCommandUseCase,
   ],
+  exports: [ExecCommandUseCase, ResolveActiveSandbox, SandboxAgentClient],
 })
 export class WorkspaceModule {}

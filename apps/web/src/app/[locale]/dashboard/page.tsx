@@ -163,7 +163,7 @@ function CreateProjectForm({ onDone }: { onDone: (p: Project | null) => void }) 
           value={slug}
           onChange={(e) => setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-'))}
           required
-          pattern="[a-z0-9-]+"
+          pattern="[a-z0-9\-]+"
           className="mt-1"
           dir="ltr"
         />

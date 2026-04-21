@@ -3,7 +3,6 @@ import { AuthModule } from '../auth/auth.module';
 import { ProjectsModule } from '../projects/projects.module';
 import { SandboxesModule } from '../sandboxes/sandboxes.module';
 import { WorkspaceModule } from '../workspace/workspace.module';
-import { ExecCommandUseCase } from '../workspace/application/exec-command.usecase';
 import { GitHubIntegrationRepository } from './domain/github-integration.repository';
 import { PrismaGitHubIntegrationRepository } from './infrastructure/prisma-github-integration.repository';
 import { StartGitHubOAuthUseCase } from './application/start-oauth.usecase';
@@ -21,7 +20,6 @@ import { GitHubController } from './interfaces/http/github.controller';
     CompleteGitHubOAuthUseCase,
     GetGitHubIntegrationUseCase,
     PushWorkspaceUseCase,
-    ExecCommandUseCase,
   ],
 })
 export class GitHubModule {}

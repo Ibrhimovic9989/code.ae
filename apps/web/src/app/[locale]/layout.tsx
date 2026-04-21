@@ -41,7 +41,7 @@ export default async function LocaleLayout({
   const dir = LOCALE_DIRECTION[locale as Locale];
 
   return (
-    <html lang={locale} dir={dir} className={`${inter.variable} ${tajawal.variable}`}>
+    <html lang={locale} dir={dir} className={`${inter.variable} ${tajawal.variable}`} suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeBootstrapScript }} />
       </head>

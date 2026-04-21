@@ -103,7 +103,7 @@ export function GitHubPushButton({ projectId, projectSlug }: Props) {
                 required
                 value={repoName}
                 onChange={(e) => setRepoName(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-'))}
-                pattern="[a-z0-9-]+"
+                pattern="[a-z0-9\-]+"
                 dir="ltr"
                 className="mt-1 font-mono text-xs"
               />
