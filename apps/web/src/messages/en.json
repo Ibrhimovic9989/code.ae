@@ -1,0 +1,31 @@
+{
+  "brand": {
+    "name": "Code.ae",
+    "tagline": "AI coding platform for the Gulf"
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "projects": "Projects",
+    "settings": "Settings",
+    "signIn": "Sign in",
+    "signUp": "Sign up"
+  },
+  "landing": {
+    "heroTitle": "Build your app with AI",
+    "heroSubtitle": "Describe your idea in Arabic or English and get a full web app with clean, separated frontend and backend — ready to deploy.",
+    "ctaStart": "Get started",
+    "ctaLearnMore": "Learn more"
+  },
+  "dashboard": {
+    "title": "Your projects",
+    "newProject": "New project",
+    "empty": "No projects yet. Start your first one."
+  },
+  "project": {
+    "preview": "Live preview",
+    "files": "Files",
+    "chat": "Chat",
+    "env": "Environment variables",
+    "databases": "Databases"
+  }
+}

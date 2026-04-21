@@ -1,0 +1,108 @@
+// Code.ae platform database schema
+// User databases are BYO and never touched here.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String         @id @default(uuid()) @db.Uuid
+  email         String         @unique
+  passwordHash  String
+  displayName   String
+  locale        String         @default("ar")
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  projects      Project[]
+  refreshTokens RefreshToken[]
+}
+
+model RefreshToken {
+  id                String   @id @default(uuid()) @db.Uuid
+  userId            String   @db.Uuid
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash         String
+  expiresAt         DateTime
+  revokedAt         DateTime?
+  replacedByTokenId String?  @db.Uuid
+  userAgent         String?
+  ipAddress         String?
+  createdAt         DateTime @default(now())
+
+  @@index([userId])
+  @@index([tokenHash])
+}
+
+model Project {
+  id            String         @id @default(uuid()) @db.Uuid
+  ownerId       String         @db.Uuid
+  owner         User           @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  slug          String         @unique
+  name          String
+  description   String?
+  template      String
+  visibility    String         @default("private")
+  githubRepoUrl String?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  sessions      Session[]
+  secrets       Secret[]
+  sandboxes     Sandbox[]
+
+  @@index([ownerId])
+}
+
+model Session {
+  id             String   @id @default(uuid()) @db.Uuid
+  projectId      String   @db.Uuid
+  project        Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  status         String
+  sandboxId      String?
+  startedAt      DateTime @default(now())
+  lastActivityAt DateTime @default(now())
+  messages       Message[]
+
+  @@index([projectId])
+}
+
+model Message {
+  id        String   @id @default(uuid()) @db.Uuid
+  sessionId String   @db.Uuid
+  session   Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  role      String
+  content   String   @db.Text
+  toolCalls Json?
+  createdAt DateTime @default(now())
+
+  @@index([sessionId, createdAt])
+}
+
+model Secret {
+  id          String   @id @default(uuid()) @db.Uuid
+  projectId   String   @db.Uuid
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  key         String
+  scope       String
+  keyVaultRef String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([projectId, key, scope])
+}
+
+model Sandbox {
+  id         String    @id
+  projectId  String    @db.Uuid
+  project    Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  status     String
+  previewUrl String?
+  createdAt  DateTime  @default(now())
+  stoppedAt  DateTime?
+
+  @@index([projectId])
+}
