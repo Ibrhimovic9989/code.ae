@@ -20,7 +20,7 @@ export interface ChatTurn {
   pending: boolean;
 }
 
-export function useSessionStream(projectSlug: string) {
+export function useSessionStream(projectSlug: string, ready: boolean = true) {
   const [project, setProject] = useState<Project | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [status, setStatus] = useState<'idle' | 'starting' | 'ready' | 'error'>('idle');
@@ -48,8 +48,9 @@ export function useSessionStream(projectSlug: string) {
   }, [projectSlug]);
 
   useEffect(() => {
+    if (!ready) return;
     void bootstrap();
-  }, [bootstrap]);
+  }, [bootstrap, ready]);
 
   const send = useCallback(
     async (content: string) => {

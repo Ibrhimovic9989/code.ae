@@ -22,7 +22,10 @@ export default function ProjectWorkspacePage() {
   const slug = params?.slug ?? '';
   const locale = params?.locale ?? 'ar';
 
-  const { project, status: sessStatus, error, turns, sending, send } = useSessionStream(slug);
+  const { project, status: sessStatus, error, turns, sending, send } = useSessionStream(
+    slug,
+    status === 'authenticated',
+  );
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [secretsOpen, setSecretsOpen] = useState(false);
 
