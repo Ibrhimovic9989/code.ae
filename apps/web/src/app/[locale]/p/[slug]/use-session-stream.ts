@@ -20,7 +20,11 @@ export interface ChatTurn {
   pending: boolean;
 }
 
-export function useSessionStream(projectSlug: string, ready: boolean = true) {
+export function useSessionStream(
+  projectSlug: string,
+  ready: boolean = true,
+  locale: 'ar' | 'en' = 'ar',
+) {
   const [project, setProject] = useState<Project | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [status, setStatus] = useState<'idle' | 'starting' | 'ready' | 'error'>('idle');
@@ -64,7 +68,7 @@ export function useSessionStream(projectSlug: string, ready: boolean = true) {
       ]);
 
       try {
-        const res = await api.streamMessage(session.id, content);
+        const res = await api.streamMessage(session.id, content, locale);
         if (!res.ok && res.status !== 200) {
           const text = await res.text();
           throw new Error(`HTTP ${res.status}: ${text}`);
@@ -85,7 +89,7 @@ export function useSessionStream(projectSlug: string, ready: boolean = true) {
         setSending(false);
       }
     },
-    [session],
+    [session, locale],
   );
 
   return { project, session, status, error, turns, sending, send };

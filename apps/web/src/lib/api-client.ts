@@ -161,7 +161,7 @@ class ApiClient {
     return this.request(`/projects/${projectId}/github/push`, { method: 'POST', body: input });
   }
 
-  streamMessage(sessionId: string, content: string): Promise<Response> {
+  streamMessage(sessionId: string, content: string, locale?: 'ar' | 'en'): Promise<Response> {
     return fetch(`${API_URL}/sessions/${sessionId}/messages`, {
       method: 'POST',
       credentials: 'include',
@@ -169,7 +169,7 @@ class ApiClient {
         'Content-Type': 'application/json',
         ...(this.accessToken ? { Authorization: `Bearer ${this.accessToken}` } : {}),
       },
-      body: JSON.stringify({ content }),
+      body: JSON.stringify({ content, ...(locale ? { locale } : {}) }),
     });
   }
 
