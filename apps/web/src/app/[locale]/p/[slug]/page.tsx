@@ -5,11 +5,12 @@ import { useParams, useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useAuth } from '../../../../lib/auth-context';
 import { api } from '../../../../lib/api-client';
-import { Spinner } from '../../../../components/ui';
+import { Button, Spinner } from '../../../../components/ui';
 import { ChatPanel } from './chat-panel';
 import { EditorPanel } from './editor-panel';
 import { PreviewPanel } from './preview-panel';
 import { TerminalPanel } from './terminal-panel';
+import { SecretsDialog } from './secrets-dialog';
 import { useSessionStream } from './use-session-stream';
 
 export default function ProjectWorkspacePage() {
@@ -22,12 +23,12 @@ export default function ProjectWorkspacePage() {
 
   const { project, status: sessStatus, error, turns, sending, send } = useSessionStream(slug);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [secretsOpen, setSecretsOpen] = useState(false);
 
   useEffect(() => {
     if (status === 'unauthenticated') router.replace(`/${locale}/login`);
   }, [status, router, locale]);
 
-  // Poll sandbox status once the session is ready to pick up previewUrl.
   useEffect(() => {
     if (sessStatus !== 'ready' || !project) return;
     let cancelled = false;
@@ -42,7 +43,10 @@ export default function ProjectWorkspacePage() {
     };
     void poll();
     const iv = setInterval(poll, 5000);
-    return () => { cancelled = true; clearInterval(iv); };
+    return () => {
+      cancelled = true;
+      clearInterval(iv);
+    };
   }, [sessStatus, project]);
 
   if (status === 'loading') {
@@ -65,22 +69,37 @@ export default function ProjectWorkspacePage() {
           </div>
         </div>
       ) : (
-        <div className="grid h-full grid-cols-1 lg:grid-cols-[420px_1fr_1fr] gap-px bg-neutral-200 dark:bg-neutral-800">
-          <section className="min-h-0 bg-white dark:bg-neutral-950">
-            <ChatPanel turns={turns} onSend={send} sending={sending} disabled={sessStatus !== 'ready'} />
-          </section>
-          <section className="hidden min-h-0 grid-rows-[1fr_220px] gap-px bg-neutral-200 lg:grid dark:bg-neutral-800">
-            <div className="min-h-0 bg-white dark:bg-neutral-950">
-              <EditorPanel projectId={project?.id ?? null} sandboxReady={sessStatus === 'ready'} />
-            </div>
-            <div className="min-h-0">
-              <TerminalPanel projectId={project?.id ?? null} sandboxReady={sessStatus === 'ready'} />
-            </div>
-          </section>
-          <section className="hidden min-h-0 bg-white lg:block dark:bg-neutral-950">
-            <PreviewPanel previewUrl={previewUrl} />
-          </section>
-        </div>
+        <>
+          <div className="flex items-center gap-3 border-b border-neutral-200 bg-white px-4 py-2 text-sm dark:border-neutral-800 dark:bg-neutral-950">
+            <span className="font-medium">{project?.name}</span>
+            <span className="font-mono text-xs text-neutral-500" dir="ltr">
+              {project?.slug}
+            </span>
+            <div className="flex-1" />
+            <Button variant="secondary" onClick={() => setSecretsOpen(true)}>
+              {t('workspace.env')}
+            </Button>
+          </div>
+
+          <SecretsDialog projectId={project?.id ?? null} open={secretsOpen} onOpenChange={setSecretsOpen} />
+
+          <div className="grid h-[calc(100%-2.75rem)] grid-cols-1 lg:grid-cols-[420px_1fr_1fr] gap-px bg-neutral-200 dark:bg-neutral-800">
+            <section className="min-h-0 bg-white dark:bg-neutral-950">
+              <ChatPanel turns={turns} onSend={send} sending={sending} disabled={sessStatus !== 'ready'} />
+            </section>
+            <section className="hidden min-h-0 grid-rows-[1fr_220px] gap-px bg-neutral-200 lg:grid dark:bg-neutral-800">
+              <div className="min-h-0 bg-white dark:bg-neutral-950">
+                <EditorPanel projectId={project?.id ?? null} sandboxReady={sessStatus === 'ready'} />
+              </div>
+              <div className="min-h-0">
+                <TerminalPanel projectId={project?.id ?? null} sandboxReady={sessStatus === 'ready'} />
+              </div>
+            </section>
+            <section className="hidden min-h-0 bg-white lg:block dark:bg-neutral-950">
+              <PreviewPanel previewUrl={previewUrl} />
+            </section>
+          </div>
+        </>
       )}
     </main>
   );

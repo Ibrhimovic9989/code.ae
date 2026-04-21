@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { AuthModule } from '../auth/auth.module';
 import { ProjectsModule } from '../projects/projects.module';
+import { SecretsModule } from '../secrets/secrets.module';
 import { SandboxRepository } from './domain/sandbox.repository';
 import { OrchestratorClient } from './domain/orchestrator-client';
 import { PrismaSandboxRepository } from './infrastructure/prisma-sandbox.repository';
@@ -11,7 +12,7 @@ import { StopSandboxUseCase } from './application/stop-sandbox.usecase';
 import { SandboxesController } from './interfaces/http/sandboxes.controller';
 
 @Module({
-  imports: [AuthModule, ProjectsModule],
+  imports: [AuthModule, ProjectsModule, SecretsModule],
   controllers: [SandboxesController],
   providers: [
     { provide: SandboxRepository, useClass: PrismaSandboxRepository },
@@ -20,5 +21,6 @@ import { SandboxesController } from './interfaces/http/sandboxes.controller';
     GetSandboxUseCase,
     StopSandboxUseCase,
   ],
+  exports: [StartSandboxUseCase, SandboxRepository],
 })
 export class SandboxesModule {}

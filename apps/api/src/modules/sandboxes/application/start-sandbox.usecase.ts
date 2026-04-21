@@ -4,6 +4,7 @@ import { ProjectRepository } from '../../projects/domain/project.repository';
 import { SandboxRepository } from '../domain/sandbox.repository';
 import { OrchestratorClient } from '../domain/orchestrator-client';
 import { SandboxEntity } from '../domain/sandbox.entity';
+import { ResolveSecretsForSandboxUseCase } from '../../secrets/application/resolve-secrets-for-sandbox.usecase';
 
 @Injectable()
 export class StartSandboxUseCase {
@@ -11,6 +12,7 @@ export class StartSandboxUseCase {
     private readonly projects: ProjectRepository,
     private readonly sandboxes: SandboxRepository,
     private readonly orchestrator: OrchestratorClient,
+    private readonly resolveSecrets: ResolveSecretsForSandboxUseCase,
   ) {}
 
   async execute(projectId: string, ownerId: string): Promise<SandboxEntity> {
@@ -21,12 +23,15 @@ export class StartSandboxUseCase {
     const existing = await this.sandboxes.findActiveByProject(projectId);
     if (existing) return existing;
 
+    const env = await this.resolveSecrets.execute(projectId, 'development');
+
     const spec = SandboxSpecSchema.parse({
       projectId,
       image: 'code-ae-sandbox:latest',
       cpuCores: 1,
       memoryGb: 2,
       envRefs: [],
+      env,
       ports: [3000, 4000],
       idleTimeoutSeconds: 600,
     });

@@ -137,6 +137,25 @@ class ApiClient {
     });
   }
 
+  async listSecrets(
+    projectId: string,
+    scope?: 'development' | 'production',
+  ): Promise<{ secrets: Array<{ id: string; key: string; scope: string; createdAt: string; updatedAt: string }> }> {
+    const q = scope ? `?scope=${scope}` : '';
+    return this.request(`/projects/${projectId}/secrets${q}`, { method: 'GET' });
+  }
+
+  async upsertSecret(
+    projectId: string,
+    input: { key: string; value: string; scope: 'development' | 'production' },
+  ): Promise<{ secret: { id: string; key: string; scope: string } }> {
+    return this.request(`/projects/${projectId}/secrets`, { method: 'POST', body: input });
+  }
+
+  async deleteSecret(secretId: string): Promise<void> {
+    await this.request(`/secrets/${secretId}`, { method: 'DELETE' });
+  }
+
   streamExec(projectId: string, command: string, cwd = '.'): Promise<Response> {
     return fetch(`${API_URL}/projects/${projectId}/exec/stream`, {
       method: 'POST',

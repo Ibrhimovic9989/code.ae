@@ -16,6 +16,7 @@ export const SandboxSpecSchema = z.object({
   cpuCores: z.number().min(0.25).max(4).default(1),
   memoryGb: z.number().min(0.5).max(8).default(2),
   envRefs: z.array(z.string()).default([]),
+  env: z.record(z.string(), z.string()).default({}),
   ports: z.array(z.number().int().min(1).max(65535)).default([3000, 4000]),
   idleTimeoutSeconds: z.number().int().min(60).max(3600).default(600),
 });
