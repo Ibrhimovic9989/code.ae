@@ -13,6 +13,11 @@ export const appConfigSchema = z.object({
   AZURE_OPENAI_API_KEY: z.string().min(1),
   AZURE_OPENAI_DEPLOYMENT: z.string().default('gpt-5.2-chat'),
   AZURE_OPENAI_API_VERSION: z.string().default('2025-04-01-preview'),
+
+  GITHUB_OAUTH_CLIENT_ID: z.string().min(1).optional(),
+  GITHUB_OAUTH_CLIENT_SECRET: z.string().min(1).optional(),
+  GITHUB_OAUTH_REDIRECT_URL: z.string().url().default('http://localhost:4000/api/v1/auth/github/callback'),
+  GITHUB_OAUTH_POST_REDIRECT: z.string().url().default('http://localhost:3000/dashboard'),
 });
 
 export type AppConfig = z.infer<typeof appConfigSchema>;

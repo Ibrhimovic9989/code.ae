@@ -125,18 +125,6 @@ class ApiClient {
     );
   }
 
-  streamMessage(sessionId: string, content: string): Promise<Response> {
-    return fetch(`${API_URL}/sessions/${sessionId}/messages`, {
-      method: 'POST',
-      credentials: 'include',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(this.accessToken ? { Authorization: `Bearer ${this.accessToken}` } : {}),
-      },
-      body: JSON.stringify({ content }),
-    });
-  }
-
   async listSecrets(
     projectId: string,
     scope?: 'development' | 'production',
@@ -154,6 +142,35 @@ class ApiClient {
 
   async deleteSecret(secretId: string): Promise<void> {
     await this.request(`/secrets/${secretId}`, { method: 'DELETE' });
+  }
+
+  async getGitHubIntegration(): Promise<{
+    integration: { githubLogin: string; scopes: string; connectedAt: string } | null;
+  }> {
+    return this.request('/auth/github', { method: 'GET' });
+  }
+
+  async startGitHubOAuth(): Promise<{ url: string; state: string }> {
+    return this.request('/auth/github/start', { method: 'GET' });
+  }
+
+  async pushToGitHub(
+    projectId: string,
+    input: { repoName?: string; privateRepo?: boolean; commitMessage?: string } = {},
+  ): Promise<{ ok: boolean; owner: string; repo: string; url: string; stdout: string; stderr: string }> {
+    return this.request(`/projects/${projectId}/github/push`, { method: 'POST', body: input });
+  }
+
+  streamMessage(sessionId: string, content: string): Promise<Response> {
+    return fetch(`${API_URL}/sessions/${sessionId}/messages`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(this.accessToken ? { Authorization: `Bearer ${this.accessToken}` } : {}),
+      },
+      body: JSON.stringify({ content }),
+    });
   }
 
   streamExec(projectId: string, command: string, cwd = '.'): Promise<Response> {

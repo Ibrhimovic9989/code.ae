@@ -20,36 +20,49 @@ model User {
   updatedAt     DateTime       @updatedAt
   projects      Project[]
   refreshTokens RefreshToken[]
+  github        GitHubIntegration?
+}
+
+model GitHubIntegration {
+  id          String   @id @default(uuid()) @db.Uuid
+  userId      String   @unique @db.Uuid
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  githubLogin String
+  githubId    Int
+  accessToken String
+  scopes      String   @default("repo")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 
 model RefreshToken {
-  id                String   @id @default(uuid()) @db.Uuid
-  userId            String   @db.Uuid
-  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                String    @id @default(uuid()) @db.Uuid
+  userId            String    @db.Uuid
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   tokenHash         String
   expiresAt         DateTime
   revokedAt         DateTime?
-  replacedByTokenId String?  @db.Uuid
+  replacedByTokenId String?   @db.Uuid
   userAgent         String?
   ipAddress         String?
-  createdAt         DateTime @default(now())
+  createdAt         DateTime  @default(now())
 
   @@index([userId])
   @@index([tokenHash])
 }
 
 model Project {
-  id            String         @id @default(uuid()) @db.Uuid
-  ownerId       String         @db.Uuid
-  owner         User           @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  slug          String         @unique
+  id            String    @id @default(uuid()) @db.Uuid
+  ownerId       String    @db.Uuid
+  owner         User      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  slug          String    @unique
   name          String
   description   String?
   template      String
-  visibility    String         @default("private")
+  visibility    String    @default("private")
   githubRepoUrl String?
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
   sessions      Session[]
   secrets       Secret[]
   sandboxes     Sandbox[]
@@ -58,13 +71,13 @@ model Project {
 }
 
 model Session {
-  id             String   @id @default(uuid()) @db.Uuid
-  projectId      String   @db.Uuid
-  project        Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  id             String    @id @default(uuid()) @db.Uuid
+  projectId      String    @db.Uuid
+  project        Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
   status         String
   sandboxId      String?
-  startedAt      DateTime @default(now())
-  lastActivityAt DateTime @default(now())
+  startedAt      DateTime  @default(now())
+  lastActivityAt DateTime  @default(now())
   messages       Message[]
 
   @@index([projectId])

@@ -11,6 +11,7 @@ import { EditorPanel } from './editor-panel';
 import { PreviewPanel } from './preview-panel';
 import { TerminalPanel } from './terminal-panel';
 import { SecretsDialog } from './secrets-dialog';
+import { GitHubPushButton } from './github-push-button';
 import { useSessionStream } from './use-session-stream';
 
 export default function ProjectWorkspacePage() {
@@ -76,6 +77,7 @@ export default function ProjectWorkspacePage() {
               {project?.slug}
             </span>
             <div className="flex-1" />
+            <GitHubPushButton projectId={project?.id ?? null} projectSlug={project?.slug ?? null} />
             <Button variant="secondary" onClick={() => setSecretsOpen(true)}>
               {t('workspace.env')}
             </Button>
