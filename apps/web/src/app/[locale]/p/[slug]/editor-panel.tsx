@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
+import { toast } from 'sonner';
 import { api } from '../../../../lib/api-client';
 import { Spinner } from '../../../../components/ui';
 import { FileTree } from './file-tree';
@@ -46,6 +47,8 @@ export function EditorPanel({ projectId, sandboxReady }: EditorPanelProps) {
       setSaving(true);
       try {
         await api.writeFile(projectId, path, next);
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : String(err));
       } finally {
         setSaving(false);
       }
@@ -76,8 +79,9 @@ export function EditorPanel({ projectId, sandboxReady }: EditorPanelProps) {
         await api.moveFile(projectId, from, to);
         if (currentPath === from) setCurrentPath(to);
         await refresh('.');
-      } catch {
-        /* surfaced via toast later */
+        toast.success(`${from} → ${to}`);
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : String(err));
       }
     },
     [projectId, currentPath, refresh],
@@ -91,8 +95,9 @@ export function EditorPanel({ projectId, sandboxReady }: EditorPanelProps) {
       try {
         await api.writeFileBase64(projectId, destPath, base64);
         await refresh(targetDir);
-      } catch {
-        /* ignore */
+        toast.success(`uploaded ${file.name}`);
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : String(err));
       }
     },
     [projectId, refresh],

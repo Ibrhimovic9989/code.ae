@@ -3,17 +3,38 @@
 @tailwind utilities;
 
 :root {
-  --font-ui: 'Tajawal', 'Inter', system-ui, sans-serif;
-  --font-arabic: 'Tajawal', 'Cairo', sans-serif;
+  --font-ui: var(--font-inter), 'Inter', system-ui, sans-serif;
+  --font-arabic: var(--font-tajawal), 'Tajawal', 'Cairo', system-ui, sans-serif;
   color-scheme: light dark;
+
+  /* Surface layering — light */
+  --surface-0: 255 255 255;
+  --surface-1: 250 250 250;
+  --surface-2: 245 245 245;
+  --border: 229 229 229;
+}
+
+.dark {
+  --surface-0: 10 10 10;
+  --surface-1: 20 20 20;
+  --surface-2: 30 30 30;
+  --border: 38 38 38;
+  color-scheme: dark;
 }
 
 html {
   font-family: var(--font-ui);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 html[dir='rtl'] {
   font-family: var(--font-arabic);
+}
+
+/* Arabic font uses wider line-height for better readability */
+html[dir='rtl'] body {
+  line-height: 1.65;
 }
 
 @layer utilities {
@@ -21,4 +42,29 @@ html[dir='rtl'] {
     direction: ltr;
     text-align: left;
   }
+
+  .skeleton {
+    @apply animate-pulse rounded-md bg-neutral-200 dark:bg-neutral-800;
+  }
+
+  .skeleton-shimmer {
+    background: linear-gradient(
+      90deg,
+      rgb(var(--surface-1)) 0%,
+      rgb(var(--surface-2)) 50%,
+      rgb(var(--surface-1)) 100%
+    );
+    background-size: 800px 100%;
+    @apply animate-shimmer rounded-md;
+  }
+}
+
+/* Sonner toast overrides to match theme */
+[data-sonner-toaster] {
+  --normal-bg: rgb(var(--surface-0));
+  --normal-text: rgb(17 17 17);
+  --normal-border: rgb(var(--border));
+}
+.dark [data-sonner-toaster] {
+  --normal-text: rgb(245 245 245);
 }

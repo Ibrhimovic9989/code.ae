@@ -6,6 +6,7 @@ import type { Locale } from '@code-ae/shared';
 import { useAuth } from '../lib/auth-context';
 import { Button } from './ui';
 import { LocaleSwitcher } from './locale-switcher';
+import { ThemeToggle } from './theme-toggle';
 
 export function Header({ locale }: { locale: Locale }) {
   const t = useTranslations();
@@ -29,13 +30,15 @@ export function Header({ locale }: { locale: Locale }) {
               </Link>
               <span className="text-sm text-neutral-500">{user?.displayName}</span>
               <LocaleSwitcher current={locale} />
+              <ThemeToggle />
               <Button variant="ghost" onClick={() => void logout()}>
-                {t('nav.logout', { default: 'Logout' })}
+                {t('nav.logout')}
               </Button>
             </>
           ) : (
             <>
               <LocaleSwitcher current={locale} />
+              <ThemeToggle />
               <Link
                 href={`/${locale}/login`}
                 className="rounded px-3 py-1.5 text-sm hover:bg-neutral-100 dark:hover:bg-neutral-800"
