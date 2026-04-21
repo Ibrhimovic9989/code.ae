@@ -48,6 +48,7 @@ export class SendMessageUseCase {
     sessionId: string,
     ownerId: string,
     userContent: string,
+    userLocale: 'ar' | 'en' = 'ar',
   ): AsyncGenerator<SessionStreamEvent> {
     if (!userContent.trim()) throw new ValidationError('Message content is required');
 
@@ -92,7 +93,7 @@ export class SendMessageUseCase {
     const systemPrompt = buildSystemPrompt({
       projectName: project.slug,
       projectTemplate: 'next-nest-monorepo',
-      userLocale: (project as unknown as { ownerId: string } & { locale?: 'ar' | 'en' }).locale ?? 'ar',
+      userLocale,
       hasBackend: true,
       hasFrontend: true,
     });
