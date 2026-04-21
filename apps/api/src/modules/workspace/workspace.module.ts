@@ -13,6 +13,7 @@ import { ListFilesUseCase } from './application/list-files.usecase';
 import { DeleteFileUseCase } from './application/delete-file.usecase';
 import { MoveFileUseCase } from './application/move-file.usecase';
 import { ExecCommandUseCase } from './application/exec-command.usecase';
+import { StreamCommandUseCase } from './application/stream-command.usecase';
 import { WorkspaceController } from './interfaces/http/workspace.controller';
 
 @Module({
@@ -28,6 +29,7 @@ import { WorkspaceController } from './interfaces/http/workspace.controller';
     DeleteFileUseCase,
     MoveFileUseCase,
     ExecCommandUseCase,
+    StreamCommandUseCase,
   ],
 })
 export class WorkspaceModule {}

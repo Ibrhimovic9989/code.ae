@@ -1,4 +1,5 @@
-import { Body, Controller, Delete, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post, Query, Res, UseGuards } from '@nestjs/common';
+import type { FastifyReply } from 'fastify';
 import { JwtAuthGuard } from '../../../auth/interfaces/http/jwt-auth.guard';
 import { CurrentUser } from '../../../auth/interfaces/http/current-user.decorator';
 import type { AccessTokenPayload } from '../../../auth/infrastructure/jwt.service';
@@ -8,6 +9,7 @@ import { ListFilesUseCase } from '../../application/list-files.usecase';
 import { DeleteFileUseCase } from '../../application/delete-file.usecase';
 import { MoveFileUseCase } from '../../application/move-file.usecase';
 import { ExecCommandUseCase } from '../../application/exec-command.usecase';
+import { StreamCommandUseCase } from '../../application/stream-command.usecase';
 
 @Controller('projects/:projectId')
 @UseGuards(JwtAuthGuard)
@@ -19,6 +21,7 @@ export class WorkspaceController {
     private readonly deleteFile: DeleteFileUseCase,
     private readonly moveFile: MoveFileUseCase,
     private readonly execCommand: ExecCommandUseCase,
+    private readonly streamCommand: StreamCommandUseCase,
   ) {}
 
   @Post('files')
@@ -77,5 +80,36 @@ export class WorkspaceController {
     @Body() body: unknown,
   ) {
     return this.execCommand.execute(projectId, user.sub, body);
+  }
+
+  @Post('exec/stream')
+  async execStream(
+    @Param('projectId') projectId: string,
+    @CurrentUser() user: AccessTokenPayload,
+    @Body() body: unknown,
+    @Res() reply: FastifyReply,
+  ): Promise<void> {
+    const upstream = await this.streamCommand.execute(projectId, user.sub, body);
+    reply.raw.setHeader('Content-Type', 'text/event-stream');
+    reply.raw.setHeader('Cache-Control', 'no-cache, no-transform');
+    reply.raw.setHeader('Connection', 'keep-alive');
+    reply.raw.setHeader('X-Accel-Buffering', 'no');
+    reply.raw.flushHeaders?.();
+
+    if (!upstream.body) {
+      reply.raw.end();
+      return;
+    }
+
+    const reader = upstream.body.getReader();
+    try {
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        reply.raw.write(value);
+      }
+    } finally {
+      reply.raw.end();
+    }
   }
 }

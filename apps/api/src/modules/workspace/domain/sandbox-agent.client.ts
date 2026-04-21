@@ -42,4 +42,5 @@ export abstract class SandboxAgentClient {
   abstract deleteFile(ep: SandboxAgentEndpoint, path: string, recursive: boolean): Promise<void>;
   abstract moveFile(ep: SandboxAgentEndpoint, from: string, to: string, overwrite: boolean): Promise<void>;
   abstract exec(ep: SandboxAgentEndpoint, input: ExecInput): Promise<ExecResult>;
+  abstract execStream(ep: SandboxAgentEndpoint, input: ExecInput): Promise<Response>;
 }

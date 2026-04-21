@@ -137,6 +137,18 @@ class ApiClient {
     });
   }
 
+  streamExec(projectId: string, command: string, cwd = '.'): Promise<Response> {
+    return fetch(`${API_URL}/projects/${projectId}/exec/stream`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(this.accessToken ? { Authorization: `Bearer ${this.accessToken}` } : {}),
+      },
+      body: JSON.stringify({ command, cwd }),
+    });
+  }
+
   private async request<T>(path: string, opts: { method: string; body?: unknown }): Promise<T> {
     const res = await fetch(`${API_URL}${path}`, {
       method: opts.method,

@@ -65,5 +65,53 @@ export function createShellRoutes(config: AgentConfig): FastifyPluginAsync {
         });
       });
     });
+
+    app.post('/shell/exec-stream', async (req, reply) => {
+      const parsed = ExecSchema.safeParse(req.body);
+      if (!parsed.success) return reply.status(422).send({ error: parsed.error.flatten() });
+
+      const timeout = parsed.data.timeoutMs ?? config.SHELL_TIMEOUT_MS;
+      const cwd = parsed.data.cwd === '.' ? config.WORKSPACE_ROOT : parsed.data.cwd;
+
+      reply.raw.setHeader('Content-Type', 'text/event-stream');
+      reply.raw.setHeader('Cache-Control', 'no-cache, no-transform');
+      reply.raw.setHeader('Connection', 'keep-alive');
+      reply.raw.setHeader('X-Accel-Buffering', 'no');
+      reply.raw.flushHeaders?.();
+
+      const write = (event: string, data: unknown) => {
+        reply.raw.write(`event: ${event}\n`);
+        reply.raw.write(`data: ${JSON.stringify(data)}\n\n`);
+      };
+
+      const proc = spawn('bash', ['-lc', parsed.data.command], { cwd, env: process.env });
+      let timedOut = false;
+      const killTimer = setTimeout(() => {
+        timedOut = true;
+        proc.kill('SIGKILL');
+      }, timeout);
+
+      proc.stdout.on('data', (chunk: Buffer) => write('stdout', { chunk: chunk.toString('utf-8') }));
+      proc.stderr.on('data', (chunk: Buffer) => write('stderr', { chunk: chunk.toString('utf-8') }));
+
+      req.raw.on('close', () => {
+        if (proc.exitCode === null) proc.kill('SIGTERM');
+      });
+
+      return new Promise<void>((resolve) => {
+        proc.on('close', (code, signal) => {
+          clearTimeout(killTimer);
+          write('exit', { exitCode: code, signal, timedOut });
+          reply.raw.end();
+          resolve();
+        });
+        proc.on('error', (err) => {
+          clearTimeout(killTimer);
+          write('error', { message: err.message });
+          reply.raw.end();
+          resolve();
+        });
+      });
+    });
   };
 }

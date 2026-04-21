@@ -9,6 +9,7 @@ import { Spinner } from '../../../../components/ui';
 import { ChatPanel } from './chat-panel';
 import { EditorPanel } from './editor-panel';
 import { PreviewPanel } from './preview-panel';
+import { TerminalPanel } from './terminal-panel';
 import { useSessionStream } from './use-session-stream';
 
 export default function ProjectWorkspacePage() {
@@ -68,8 +69,13 @@ export default function ProjectWorkspacePage() {
           <section className="min-h-0 bg-white dark:bg-neutral-950">
             <ChatPanel turns={turns} onSend={send} sending={sending} disabled={sessStatus !== 'ready'} />
           </section>
-          <section className="hidden min-h-0 bg-white lg:block dark:bg-neutral-950">
-            <EditorPanel projectId={project?.id ?? null} sandboxReady={sessStatus === 'ready'} />
+          <section className="hidden min-h-0 grid-rows-[1fr_220px] gap-px bg-neutral-200 lg:grid dark:bg-neutral-800">
+            <div className="min-h-0 bg-white dark:bg-neutral-950">
+              <EditorPanel projectId={project?.id ?? null} sandboxReady={sessStatus === 'ready'} />
+            </div>
+            <div className="min-h-0">
+              <TerminalPanel projectId={project?.id ?? null} sandboxReady={sessStatus === 'ready'} />
+            </div>
           </section>
           <section className="hidden min-h-0 bg-white lg:block dark:bg-neutral-950">
             <PreviewPanel previewUrl={previewUrl} />

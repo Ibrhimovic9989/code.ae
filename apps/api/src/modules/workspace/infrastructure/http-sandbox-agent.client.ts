@@ -39,6 +39,21 @@ export class HttpSandboxAgentClient extends SandboxAgentClient {
     return this.call(ep, '/shell/exec', input);
   }
 
+  async execStream(ep: SandboxAgentEndpoint, input: ExecInput): Promise<Response> {
+    const res = await fetch(`${ep.baseUrl}/shell/exec-stream`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${ep.token}`,
+      },
+      body: JSON.stringify(input),
+    });
+    if (!res.ok) {
+      throw new SandboxError(`Sandbox agent /shell/exec-stream failed (${res.status}): ${await res.text()}`);
+    }
+    return res;
+  }
+
   private async call<T>(ep: SandboxAgentEndpoint, path: string, body: unknown): Promise<T> {
     const res = await fetch(`${ep.baseUrl}${path}`, {
       method: 'POST',
