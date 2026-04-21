@@ -9,6 +9,13 @@ import type { Project } from '@code-ae/shared';
 import { useAuth } from '../../../lib/auth-context';
 import { api } from '../../../lib/api-client';
 import { Button, Card, Input, Label, Spinner, ErrorText } from '../../../components/ui';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '../../../components/dialog';
 
 export default function DashboardPage() {
   const t = useTranslations();
@@ -61,22 +68,28 @@ export default function DashboardPage() {
     <main className="mx-auto max-w-6xl px-4 py-10 animate-fade-in">
       <header className="mb-8 flex items-center justify-between">
         <h1 className="text-3xl font-bold">{t('dashboard.title')}</h1>
-        <Button onClick={() => setShowCreate((v) => !v)}>{t('dashboard.newProject')}</Button>
+        <Button onClick={() => setShowCreate(true)}>{t('dashboard.newProject')}</Button>
       </header>
 
       <ErrorText>{error}</ErrorText>
 
-      {showCreate && (
-        <CreateProjectForm
-          onDone={(created) => {
-            setShowCreate(false);
-            if (created) {
-              toast.success(`${created.name} created`);
-              router.push(`/${locale}/p/${created.slug}`);
-            }
-          }}
-        />
-      )}
+      <Dialog open={showCreate} onOpenChange={setShowCreate}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t('dashboard.createTitle')}</DialogTitle>
+            <DialogDescription>{t('dashboard.newProject')}</DialogDescription>
+          </DialogHeader>
+          <CreateProjectForm
+            onDone={(created) => {
+              setShowCreate(false);
+              if (created) {
+                toast.success(`${created.name} created`);
+                router.push(`/${locale}/p/${created.slug}`);
+              }
+            }}
+          />
+        </DialogContent>
+      </Dialog>
 
       {projects && projects.length === 0 ? (
         <div className="mt-6 rounded-xl border border-dashed border-neutral-300 p-12 text-center text-neutral-500 dark:border-neutral-700">
@@ -139,55 +152,52 @@ function CreateProjectForm({ onDone }: { onDone: (p: Project | null) => void }) 
   }
 
   return (
-    <Card className="mt-6 animate-fade-in">
-      <h2 className="mb-4 text-lg font-semibold">{t('dashboard.createTitle')}</h2>
-      <form onSubmit={onSubmit} className="grid gap-4 sm:grid-cols-2">
-        <div>
-          <Label>{t('dashboard.fields.name')}</Label>
-          <Input value={name} onChange={(e) => setName(e.target.value)} required className="mt-1" />
-        </div>
-        <div>
-          <Label>{t('dashboard.fields.slug')}</Label>
-          <Input
-            value={slug}
-            onChange={(e) => setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-'))}
-            required
-            pattern="[a-z0-9-]+"
-            className="mt-1"
-            dir="ltr"
-          />
-        </div>
+    <form onSubmit={onSubmit} className="grid gap-4 sm:grid-cols-2">
+      <div>
+        <Label>{t('dashboard.fields.name')}</Label>
+        <Input value={name} onChange={(e) => setName(e.target.value)} required className="mt-1" />
+      </div>
+      <div>
+        <Label>{t('dashboard.fields.slug')}</Label>
+        <Input
+          value={slug}
+          onChange={(e) => setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-'))}
+          required
+          pattern="[a-z0-9-]+"
+          className="mt-1"
+          dir="ltr"
+        />
+      </div>
+      <div className="sm:col-span-2">
+        <Label>{t('dashboard.fields.description')}</Label>
+        <Input value={description} onChange={(e) => setDescription(e.target.value)} className="mt-1" />
+      </div>
+      <div className="sm:col-span-2">
+        <Label>{t('dashboard.fields.template')}</Label>
+        <select
+          value={template}
+          onChange={(e) => setTemplate(e.target.value)}
+          className="mt-1 block w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-900"
+        >
+          <option value="next-nest-monorepo">{t('dashboard.templates.next-nest-monorepo')}</option>
+          <option value="next-only">{t('dashboard.templates.next-only')}</option>
+          <option value="nest-only">{t('dashboard.templates.nest-only')}</option>
+          <option value="blank">{t('dashboard.templates.blank')}</option>
+        </select>
+      </div>
+      {error ? (
         <div className="sm:col-span-2">
-          <Label>{t('dashboard.fields.description')}</Label>
-          <Input value={description} onChange={(e) => setDescription(e.target.value)} className="mt-1" />
+          <ErrorText>{error}</ErrorText>
         </div>
-        <div className="sm:col-span-2">
-          <Label>{t('dashboard.fields.template')}</Label>
-          <select
-            value={template}
-            onChange={(e) => setTemplate(e.target.value)}
-            className="mt-1 block w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-900"
-          >
-            <option value="next-nest-monorepo">{t('dashboard.templates.next-nest-monorepo')}</option>
-            <option value="next-only">{t('dashboard.templates.next-only')}</option>
-            <option value="nest-only">{t('dashboard.templates.nest-only')}</option>
-            <option value="blank">{t('dashboard.templates.blank')}</option>
-          </select>
-        </div>
-        {error ? (
-          <div className="sm:col-span-2">
-            <ErrorText>{error}</ErrorText>
-          </div>
-        ) : null}
-        <div className="flex gap-2 sm:col-span-2">
-          <Button type="submit" disabled={loading}>
-            {loading ? <Spinner /> : t('dashboard.create')}
-          </Button>
-          <Button variant="secondary" type="button" onClick={() => onDone(null)}>
-            {t('dashboard.cancel')}
-          </Button>
-        </div>
-      </form>
-    </Card>
+      ) : null}
+      <div className="flex flex-row-reverse gap-2 sm:col-span-2">
+        <Button type="submit" disabled={loading}>
+          {loading ? <Spinner /> : t('dashboard.create')}
+        </Button>
+        <Button variant="secondary" type="button" onClick={() => onDone(null)}>
+          {t('dashboard.cancel')}
+        </Button>
+      </div>
+    </form>
   );
 }
