@@ -12,6 +12,7 @@ export interface ToolContext {
 export interface ToolDispatchResult {
   ok: boolean;
   output: unknown;
+  pending?: boolean;
 }
 
 @Injectable()
@@ -43,6 +44,11 @@ export class ToolDispatcher {
         case 'exec': {
           const res = await this.execCommand.execute(ctx.projectId, ctx.ownerId, input);
           return { ok: true, output: res };
+        }
+        case 'ask_user': {
+          // Pending — the user answers via a form; we'll persist the tool result
+          // on the next POST in toolResponses[]. We don't execute anything here.
+          return { ok: true, pending: true, output: null };
         }
         default:
           return { ok: false, output: { error: `Unknown tool: ${name}` } };

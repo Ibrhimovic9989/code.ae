@@ -20,8 +20,16 @@ export type SessionStreamEvent =
   | { type: 'assistant-text'; text: string }
   | { type: 'tool-call'; id: string; name: string; input: Record<string, unknown> }
   | { type: 'tool-result'; id: string; ok: boolean; output: unknown }
+  | { type: 'awaiting-input'; id: string; question: string; options: Array<{ label: string; description?: string }>; allowMultiple: boolean; allowFreeText: boolean }
   | { type: 'turn-complete'; stopReason: string }
   | { type: 'error'; error: string };
+
+export interface ToolResponseInput {
+  /** The tool_call_id emitted by the model in the previous turn. */
+  id: string;
+  /** The content to send back as the tool_result. Opaque JSON-serializable payload. */
+  content: unknown;
+}
 
 @Injectable()
 export class SendMessageUseCase {
@@ -49,8 +57,11 @@ export class SendMessageUseCase {
     ownerId: string,
     userContent: string,
     userLocale: 'ar' | 'en' = 'ar',
+    toolResponses: ToolResponseInput[] = [],
   ): AsyncGenerator<SessionStreamEvent> {
-    if (!userContent.trim()) throw new ValidationError('Message content is required');
+    if (!userContent.trim() && toolResponses.length === 0) {
+      throw new ValidationError('Either message content or tool responses required');
+    }
 
     const session = await this.sessions.findById(sessionId);
     if (!session) throw new NotFoundError('Session', sessionId);
@@ -58,22 +69,40 @@ export class SendMessageUseCase {
     if (!project) throw new NotFoundError('Project', session.projectId);
     if (project.ownerId !== ownerId) throw new ForbiddenError('Not your session');
 
-    // Persist user message, bump activity timestamp.
-    await this.messages.append(
-      MessageEntity.create({
-        id: randomUUID(),
-        sessionId: session.id,
-        role: 'user',
-        content: userContent,
-        toolCalls: null,
-        toolCallId: null,
-        createdAt: new Date(),
-      }),
-    );
+    // 1. Persist any tool responses BEFORE the new user message so the assistant
+    //    turn that requested them is immediately followed by its answers.
+    for (const resp of toolResponses) {
+      const content = typeof resp.content === 'string' ? resp.content : JSON.stringify(resp.content);
+      await this.messages.append(
+        MessageEntity.create({
+          id: randomUUID(),
+          sessionId: session.id,
+          role: 'tool',
+          content,
+          toolCalls: null,
+          toolCallId: resp.id,
+          createdAt: new Date(),
+        }),
+      );
+    }
+
+    // 2. Persist the new user message (may be empty — form submission without extra text).
+    if (userContent.trim()) {
+      await this.messages.append(
+        MessageEntity.create({
+          id: randomUUID(),
+          sessionId: session.id,
+          role: 'user',
+          content: userContent,
+          toolCalls: null,
+          toolCallId: null,
+          createdAt: new Date(),
+        }),
+      );
+    }
     session.touch();
     await this.sessions.save(session);
 
-    // Build provider + runner once per send.
     const provider = new AzureOpenAIProvider({
       endpoint: this.endpoint,
       apiKey: this.apiKey,
@@ -86,7 +115,6 @@ export class SendMessageUseCase {
       workingDirectory: '/home/workspace/project',
     });
 
-    // Convert persisted history to agent-runtime messages.
     const history = await this.messages.listBySession(session.id);
     const agentMessages: AgentMessage[] = history.map((m) => this.toAgentMessage(m));
 
@@ -139,18 +167,42 @@ export class SendMessageUseCase {
       agentMessages.push(this.toAgentMessage(assistantMessage));
 
       if (pendingToolCalls.length === 0) {
-        // No more tools -> terminal turn.
         session.touch();
         await this.sessions.save(session);
         return;
       }
 
-      // Execute each tool, persist result, feed back to model.
+      // Check for ask_user: if present, halt the loop and wait for the user to
+      // submit answers via toolResponses on the next POST.
+      const askUserCall = pendingToolCalls.find((c) => c.name === 'ask_user');
+      if (askUserCall) {
+        const input = askUserCall.input as {
+          question?: string;
+          options?: Array<{ label: string; description?: string }>;
+          allowMultiple?: boolean;
+          allowFreeText?: boolean;
+        };
+        yield {
+          type: 'awaiting-input',
+          id: askUserCall.id,
+          question: input.question ?? '',
+          options: input.options ?? [],
+          allowMultiple: Boolean(input.allowMultiple),
+          allowFreeText: input.allowFreeText !== false,
+        };
+        session.touch();
+        await this.sessions.save(session);
+        return;
+      }
+
+      // Execute each non-pending tool, persist result, feed back to model.
       for (const call of pendingToolCalls) {
         const result = await this.dispatcher.dispatch(call.name, call.input, {
           projectId: project.id,
           ownerId,
         });
+        if (result.pending) continue; // should not happen outside ask_user
+
         yield { type: 'tool-result', id: call.id, ok: result.ok, output: result.output };
 
         const resultMessage = MessageEntity.create({
@@ -187,7 +239,7 @@ export class SendMessageUseCase {
       case 'error':
         return { type: 'error', error: ev.error };
       case 'tool-result':
-        return null; // provider-reported tool-result not used (we dispatch ourselves)
+        return null;
     }
   }
 

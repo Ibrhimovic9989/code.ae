@@ -13,11 +13,27 @@ export interface ChatToolCall {
   output: unknown;
 }
 
+export interface PendingAskUser {
+  callId: string;
+  question: string;
+  options: Array<{ label: string; description?: string }>;
+  allowMultiple: boolean;
+  allowFreeText: boolean;
+  awaiting: boolean;
+  answer?: { choices: string[]; text: string };
+}
+
 export interface ChatTurn {
   role: 'user' | 'assistant';
   text: string;
   toolCalls: ChatToolCall[];
+  askUser: PendingAskUser | null;
   pending: boolean;
+}
+
+export interface SendInput {
+  content?: string;
+  toolResponses?: Array<{ id: string; content: unknown }>;
 }
 
 export function useSessionStream(
@@ -58,28 +74,64 @@ export function useSessionStream(
   }, [bootstrap, ready]);
 
   const send = useCallback(
-    async (content: string) => {
-      if (!session || !content.trim()) return;
+    async (input: string | SendInput) => {
+      if (!session) return;
+      const normalized: SendInput = typeof input === 'string' ? { content: input } : input;
+      const content = normalized.content ?? '';
+      const toolResponses = normalized.toolResponses ?? [];
+      if (!content.trim() && toolResponses.length === 0) return;
+
       setSending(true);
 
-      setTurns((prev) => [
-        ...prev,
-        { role: 'user', text: content, toolCalls: [], pending: false },
-        { role: 'assistant', text: '', toolCalls: [], pending: true },
-      ]);
+      if (toolResponses.length > 0) {
+        setTurns((prev) => {
+          const next = [...prev];
+          for (let i = next.length - 1; i >= 0; i--) {
+            const turn = next[i];
+            if (turn && turn.askUser && turn.askUser.awaiting) {
+              const resp = toolResponses.find((r) => r.id === turn.askUser!.callId);
+              const answer = resp?.content as { choices?: string[]; text?: string } | undefined;
+              next[i] = {
+                ...turn,
+                askUser: {
+                  ...turn.askUser,
+                  awaiting: false,
+                  answer: { choices: answer?.choices ?? [], text: answer?.text ?? '' },
+                },
+              };
+              break;
+            }
+          }
+          return next;
+        });
+      }
+
+      setTurns((prev) => {
+        const next = [...prev];
+        if (content.trim()) {
+          next.push({ role: 'user', text: content, toolCalls: [], askUser: null, pending: false });
+        }
+        next.push({ role: 'assistant', text: '', toolCalls: [], askUser: null, pending: true });
+        return next;
+      });
 
       try {
-        const res = await api.streamMessage(session.id, content, locale);
+        const res = await api.streamMessage(session.id, content, locale, toolResponses);
         if (!res.ok && res.status !== 200) {
           const text = await res.text();
           throw new Error(`HTTP ${res.status}: ${text}`);
         }
         for await (const ev of parseSseStream(res)) {
-          const payload = ev.data as { type: string; text?: string; id?: string; name?: string; input?: Record<string, unknown>; ok?: boolean; output?: unknown; stopReason?: string; error?: string };
+          const payload = ev.data as Record<string, unknown>;
           setTurns((prev) => updateLastAssistant(prev, ev.event, payload));
         }
       } catch (err) {
-        setTurns((prev) => updateLastAssistant(prev, 'error', { type: 'error', error: err instanceof Error ? err.message : String(err) }));
+        setTurns((prev) =>
+          updateLastAssistant(prev, 'error', {
+            type: 'error',
+            error: err instanceof Error ? err.message : String(err),
+          }),
+        );
       } finally {
         setTurns((prev) => {
           const next = [...prev];
@@ -100,7 +152,7 @@ export function useSessionStream(
 function updateLastAssistant(
   prev: ChatTurn[],
   eventType: string,
-  payload: { type: string; text?: string; id?: string; name?: string; input?: Record<string, unknown>; ok?: boolean; output?: unknown; stopReason?: string; error?: string },
+  payload: Record<string, unknown>,
 ): ChatTurn[] {
   const next = [...prev];
   const last = next[next.length - 1];
@@ -109,33 +161,52 @@ function updateLastAssistant(
 
   switch (eventType) {
     case 'assistant-text':
-      updated.text = updated.text + (payload.text ?? '');
+      updated.text = updated.text + String(payload['text'] ?? '');
       break;
-    case 'tool-call':
-      updated.toolCalls.push({
-        id: payload.id ?? crypto.randomUUID(),
-        name: payload.name ?? 'unknown',
-        input: payload.input ?? {},
-        status: 'pending',
-        output: null,
-      });
+    case 'tool-call': {
+      const name = String(payload['name'] ?? 'unknown');
+      if (name !== 'ask_user') {
+        updated.toolCalls.push({
+          id: String(payload['id'] ?? crypto.randomUUID()),
+          name,
+          input: (payload['input'] as Record<string, unknown> | undefined) ?? {},
+          status: 'pending',
+          output: null,
+        });
+      }
       break;
+    }
     case 'tool-result': {
-      const idx = updated.toolCalls.findIndex((tc) => tc.id === payload.id);
+      const id = String(payload['id'] ?? '');
+      const idx = updated.toolCalls.findIndex((tc) => tc.id === id);
       if (idx >= 0) {
         const target = updated.toolCalls[idx];
         if (target) {
           updated.toolCalls[idx] = {
             ...target,
-            status: payload.ok ? 'ok' : 'failed',
-            output: payload.output,
+            status: payload['ok'] ? 'ok' : 'failed',
+            output: payload['output'] ?? null,
           };
         }
       }
       break;
     }
+    case 'awaiting-input': {
+      const options =
+        (payload['options'] as Array<{ label: string; description?: string }> | undefined) ?? [];
+      updated.askUser = {
+        callId: String(payload['id'] ?? ''),
+        question: String(payload['question'] ?? ''),
+        options,
+        allowMultiple: Boolean(payload['allowMultiple']),
+        allowFreeText: payload['allowFreeText'] !== false,
+        awaiting: true,
+      };
+      updated.pending = false;
+      break;
+    }
     case 'error':
-      updated.text = updated.text + `\n\n[error] ${payload.error ?? ''}`;
+      updated.text = updated.text + `\n\n[error] ${String(payload['error'] ?? '')}`;
       break;
     case 'turn-complete':
     default:

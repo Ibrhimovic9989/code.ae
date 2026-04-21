@@ -59,4 +59,45 @@ export const AGENT_TOOLS: AgentToolDefinition[] = [
       additionalProperties: false,
     },
   },
+  {
+    name: 'ask_user',
+    description:
+      'Pause and ask the user a structured question before continuing. Use ONLY when the decision is load-bearing and cannot be resolved by a sensible default. Execution halts and waits for the user to answer via a form. Prefer picking defaults and building.',
+    parameters: {
+      type: 'object',
+      properties: {
+        question: { type: 'string', description: 'The question in the user\'s locale. One sentence, concrete.' },
+        options: {
+          type: 'array',
+          description:
+            'Offered choices. Between 2 and 6 items. Each option is a short label the user can tap.',
+          items: {
+            type: 'object',
+            properties: {
+              label: { type: 'string', description: 'Short label shown on the chip (≤ 40 chars).' },
+              description: {
+                type: 'string',
+                description: 'Optional one-line hint under the label (≤ 120 chars).',
+              },
+            },
+            required: ['label'],
+            additionalProperties: false,
+          },
+          minItems: 2,
+          maxItems: 6,
+        },
+        allowMultiple: {
+          type: 'boolean',
+          description: 'If true, user can pick more than one option. Default false.',
+        },
+        allowFreeText: {
+          type: 'boolean',
+          description:
+            'If true, a free-text field is also shown so the user can add context beyond the options. Default true.',
+        },
+      },
+      required: ['question', 'options'],
+      additionalProperties: false,
+    },
+  },
 ];

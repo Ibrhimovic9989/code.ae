@@ -35,11 +35,18 @@ export class SessionsController {
   async send(
     @Param('sessionId') sessionId: string,
     @CurrentUser() user: AccessTokenPayload,
-    @Body() body: { content?: string; locale?: 'ar' | 'en' } | undefined,
+    @Body() body:
+      | {
+          content?: string;
+          locale?: 'ar' | 'en';
+          toolResponses?: Array<{ id: string; content: unknown }>;
+        }
+      | undefined,
     @Req() req: FastifyRequest,
     @Res() reply: FastifyReply,
   ): Promise<void> {
     const content = body?.content ?? '';
+    const toolResponses = body?.toolResponses ?? [];
     const locale: 'ar' | 'en' =
       body?.locale === 'en' ? 'en'
       : body?.locale === 'ar' ? 'ar'
@@ -49,7 +56,13 @@ export class SessionsController {
     applySseHeaders(req, reply);
 
     try {
-      for await (const ev of this.sendMessage.execute(sessionId, user.sub, content, locale)) {
+      for await (const ev of this.sendMessage.execute(
+        sessionId,
+        user.sub,
+        content,
+        locale,
+        toolResponses,
+      )) {
         reply.raw.write(`event: ${ev.type}\n`);
         reply.raw.write(`data: ${JSON.stringify(ev)}\n\n`);
       }
