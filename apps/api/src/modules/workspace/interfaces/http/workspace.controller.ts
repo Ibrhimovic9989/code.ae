@@ -1,5 +1,5 @@
-import { Body, Controller, Delete, Get, Param, Post, Query, Res, UseGuards } from '@nestjs/common';
-import type { FastifyReply } from 'fastify';
+import { Body, Controller, Delete, Get, Param, Post, Query, Req, Res, UseGuards } from '@nestjs/common';
+import type { FastifyReply, FastifyRequest } from 'fastify';
 import { JwtAuthGuard } from '../../../auth/interfaces/http/jwt-auth.guard';
 import { CurrentUser } from '../../../auth/interfaces/http/current-user.decorator';
 import type { AccessTokenPayload } from '../../../auth/infrastructure/jwt.service';
@@ -87,9 +87,17 @@ export class WorkspaceController {
     @Param('projectId') projectId: string,
     @CurrentUser() user: AccessTokenPayload,
     @Body() body: unknown,
+    @Req() req: FastifyRequest,
     @Res() reply: FastifyReply,
   ): Promise<void> {
     const upstream = await this.streamCommand.execute(projectId, user.sub, body);
+
+    const origin = req.headers.origin;
+    if (origin) {
+      reply.raw.setHeader('Access-Control-Allow-Origin', origin);
+      reply.raw.setHeader('Access-Control-Allow-Credentials', 'true');
+      reply.raw.setHeader('Vary', 'Origin');
+    }
     reply.raw.setHeader('Content-Type', 'text/event-stream');
     reply.raw.setHeader('Cache-Control', 'no-cache, no-transform');
     reply.raw.setHeader('Connection', 'keep-alive');

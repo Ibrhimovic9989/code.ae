@@ -64,6 +64,7 @@
     "files": "Files",
     "preview": "Live preview",
     "terminal": "Terminal",
+    "env": "Secrets",
     "placeholder": "Ask the AI what you want to build…",
     "send": "Send",
     "thinking": "Thinking…",
@@ -72,6 +73,9 @@
     "starting": "Spinning up your dev environment…",
     "ready": "Environment ready",
     "noPreview": "Preview will appear here once your dev server is running."
+  },
+  "secrets": {
+    "subtitle": "Environment variables stored in Azure Key Vault, injected into your sandbox."
   },
   "errors": {
     "generic": "Something went wrong.",

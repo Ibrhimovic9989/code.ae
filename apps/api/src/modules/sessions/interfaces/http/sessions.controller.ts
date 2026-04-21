@@ -1,5 +1,5 @@
-import { Body, Controller, Get, Param, Post, Res, UseGuards } from '@nestjs/common';
-import type { FastifyReply } from 'fastify';
+import { Body, Controller, Get, Param, Post, Req, Res, UseGuards } from '@nestjs/common';
+import type { FastifyReply, FastifyRequest } from 'fastify';
 import { JwtAuthGuard } from '../../../auth/interfaces/http/jwt-auth.guard';
 import { CurrentUser } from '../../../auth/interfaces/http/current-user.decorator';
 import type { AccessTokenPayload } from '../../../auth/infrastructure/jwt.service';
@@ -36,15 +36,12 @@ export class SessionsController {
     @Param('sessionId') sessionId: string,
     @CurrentUser() user: AccessTokenPayload,
     @Body() body: { content?: string } | undefined,
+    @Req() req: FastifyRequest,
     @Res() reply: FastifyReply,
   ): Promise<void> {
     const content = body?.content ?? '';
 
-    reply.raw.setHeader('Content-Type', 'text/event-stream');
-    reply.raw.setHeader('Cache-Control', 'no-cache, no-transform');
-    reply.raw.setHeader('Connection', 'keep-alive');
-    reply.raw.setHeader('X-Accel-Buffering', 'no');
-    reply.raw.flushHeaders?.();
+    applySseHeaders(req, reply);
 
     try {
       for await (const ev of this.sendMessage.execute(sessionId, user.sub, content)) {
@@ -59,4 +56,22 @@ export class SessionsController {
       reply.raw.end();
     }
   }
+}
+
+/**
+ * SSE responses bypass Nest/Fastify's reply pipeline because we write directly to
+ * reply.raw — so we have to re-apply the same CORS headers that enableCors() would.
+ */
+function applySseHeaders(req: FastifyRequest, reply: FastifyReply): void {
+  const origin = req.headers.origin;
+  if (origin) {
+    reply.raw.setHeader('Access-Control-Allow-Origin', origin);
+    reply.raw.setHeader('Access-Control-Allow-Credentials', 'true');
+    reply.raw.setHeader('Vary', 'Origin');
+  }
+  reply.raw.setHeader('Content-Type', 'text/event-stream');
+  reply.raw.setHeader('Cache-Control', 'no-cache, no-transform');
+  reply.raw.setHeader('Connection', 'keep-alive');
+  reply.raw.setHeader('X-Accel-Buffering', 'no');
+  reply.raw.flushHeaders?.();
 }

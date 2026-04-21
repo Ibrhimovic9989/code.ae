@@ -84,9 +84,7 @@ export function SecretsDialog({ projectId, open, onOpenChange }: SecretsDialogPr
       <DialogContent widthClass="max-w-2xl">
         <DialogHeader>
           <DialogTitle>{t('workspace.env')}</DialogTitle>
-          <DialogDescription>
-            {t('secrets.subtitle', { default: 'Environment variables stored in Azure Key Vault, injected into your sandbox.' } as never)}
-          </DialogDescription>
+          <DialogDescription>{t('secrets.subtitle')}</DialogDescription>
         </DialogHeader>
 
         <div className="mb-4 flex gap-1 rounded-md border border-neutral-200 p-0.5 text-xs w-fit dark:border-neutral-800">
