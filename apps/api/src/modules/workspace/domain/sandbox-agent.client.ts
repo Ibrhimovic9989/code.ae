@@ -40,5 +40,6 @@ export abstract class SandboxAgentClient {
   abstract readFile(ep: SandboxAgentEndpoint, path: string, encoding?: 'utf-8' | 'base64'): Promise<ReadFileResult>;
   abstract listFiles(ep: SandboxAgentEndpoint, path: string): Promise<ListResult>;
   abstract deleteFile(ep: SandboxAgentEndpoint, path: string, recursive: boolean): Promise<void>;
+  abstract moveFile(ep: SandboxAgentEndpoint, from: string, to: string, overwrite: boolean): Promise<void>;
   abstract exec(ep: SandboxAgentEndpoint, input: ExecInput): Promise<ExecResult>;
 }

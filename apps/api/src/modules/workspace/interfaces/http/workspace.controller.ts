@@ -6,6 +6,7 @@ import { WriteFileUseCase } from '../../application/write-file.usecase';
 import { ReadFileUseCase } from '../../application/read-file.usecase';
 import { ListFilesUseCase } from '../../application/list-files.usecase';
 import { DeleteFileUseCase } from '../../application/delete-file.usecase';
+import { MoveFileUseCase } from '../../application/move-file.usecase';
 import { ExecCommandUseCase } from '../../application/exec-command.usecase';
 
 @Controller('projects/:projectId')
@@ -16,6 +17,7 @@ export class WorkspaceController {
     private readonly readFile: ReadFileUseCase,
     private readonly listFiles: ListFilesUseCase,
     private readonly deleteFile: DeleteFileUseCase,
+    private readonly moveFile: MoveFileUseCase,
     private readonly execCommand: ExecCommandUseCase,
   ) {}
 
@@ -55,6 +57,16 @@ export class WorkspaceController {
     @Query('recursive') recursive?: string,
   ) {
     await this.deleteFile.execute(projectId, user.sub, path, recursive === 'true');
+    return { ok: true };
+  }
+
+  @Post('files/move')
+  async move(
+    @Param('projectId') projectId: string,
+    @CurrentUser() user: AccessTokenPayload,
+    @Body() body: unknown,
+  ) {
+    await this.moveFile.execute(projectId, user.sub, body);
     return { ok: true };
   }
 

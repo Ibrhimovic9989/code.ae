@@ -24,6 +24,12 @@ const DeleteSchema = z.object({
   recursive: z.boolean().default(false),
 });
 
+const MoveSchema = z.object({
+  from: z.string().min(1).max(2048),
+  to: z.string().min(1).max(2048),
+  overwrite: z.boolean().default(false),
+});
+
 export function createFsRoutes(ws: Workspace): FastifyPluginAsync {
   return async (app) => {
     app.post('/fs/write', async (req, reply) => {
@@ -90,6 +96,29 @@ export function createFsRoutes(ws: Workspace): FastifyPluginAsync {
         const full = ws.resolve(parsed.data.path);
         await fsp.rm(full, { recursive: parsed.data.recursive, force: false });
         return { path: parsed.data.path, deleted: true };
+      } catch (err) {
+        return handle(err, reply);
+      }
+    });
+
+    app.post('/fs/move', async (req, reply) => {
+      const parsed = MoveSchema.safeParse(req.body);
+      if (!parsed.success) return reply.status(422).send({ error: parsed.error.flatten() });
+
+      try {
+        const fromFull = ws.resolve(parsed.data.from);
+        const toFull = ws.resolve(parsed.data.to);
+        await fsp.mkdir(dirname(toFull), { recursive: true });
+        if (!parsed.data.overwrite) {
+          try {
+            await fsp.access(toFull, constants.F_OK);
+            return reply.status(409).send({ error: { code: 'EXISTS', message: `${parsed.data.to} already exists` } });
+          } catch {
+            /* target absent, proceed */
+          }
+        }
+        await fsp.rename(fromFull, toFull);
+        return { from: parsed.data.from, to: parsed.data.to };
       } catch (err) {
         return handle(err, reply);
       }

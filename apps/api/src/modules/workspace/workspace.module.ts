@@ -11,6 +11,7 @@ import { WriteFileUseCase } from './application/write-file.usecase';
 import { ReadFileUseCase } from './application/read-file.usecase';
 import { ListFilesUseCase } from './application/list-files.usecase';
 import { DeleteFileUseCase } from './application/delete-file.usecase';
+import { MoveFileUseCase } from './application/move-file.usecase';
 import { ExecCommandUseCase } from './application/exec-command.usecase';
 import { WorkspaceController } from './interfaces/http/workspace.controller';
 
@@ -25,6 +26,7 @@ import { WorkspaceController } from './interfaces/http/workspace.controller';
     ReadFileUseCase,
     ListFilesUseCase,
     DeleteFileUseCase,
+    MoveFileUseCase,
     ExecCommandUseCase,
   ],
 })

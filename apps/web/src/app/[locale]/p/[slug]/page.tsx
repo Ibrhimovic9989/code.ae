@@ -69,7 +69,7 @@ export default function ProjectWorkspacePage() {
             <ChatPanel turns={turns} onSend={send} sending={sending} disabled={sessStatus !== 'ready'} />
           </section>
           <section className="hidden min-h-0 bg-white lg:block dark:bg-neutral-950">
-            <EditorPanel />
+            <EditorPanel projectId={project?.id ?? null} sandboxReady={sessStatus === 'ready'} />
           </section>
           <section className="hidden min-h-0 bg-white lg:block dark:bg-neutral-950">
             <PreviewPanel previewUrl={previewUrl} />

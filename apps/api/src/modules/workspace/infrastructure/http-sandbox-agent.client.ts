@@ -31,6 +31,10 @@ export class HttpSandboxAgentClient extends SandboxAgentClient {
     await this.call(ep, '/fs/delete', { path, recursive });
   }
 
+  async moveFile(ep: SandboxAgentEndpoint, from: string, to: string, overwrite: boolean): Promise<void> {
+    await this.call(ep, '/fs/move', { from, to, overwrite });
+  }
+
   exec(ep: SandboxAgentEndpoint, input: ExecInput): Promise<ExecResult> {
     return this.call(ep, '/shell/exec', input);
   }

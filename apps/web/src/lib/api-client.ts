@@ -104,6 +104,27 @@ class ApiClient {
     });
   }
 
+  async writeFileBase64(projectId: string, path: string, base64: string): Promise<{ bytes: number }> {
+    return this.request(`/projects/${projectId}/files`, {
+      method: 'POST',
+      body: { path, content: base64, encoding: 'base64' },
+    });
+  }
+
+  async moveFile(projectId: string, from: string, to: string, overwrite = false): Promise<void> {
+    await this.request(`/projects/${projectId}/files/move`, {
+      method: 'POST',
+      body: { from, to, overwrite },
+    });
+  }
+
+  async deleteFile(projectId: string, path: string, recursive = false): Promise<void> {
+    await this.request(
+      `/projects/${projectId}/files?path=${encodeURIComponent(path)}&recursive=${recursive}`,
+      { method: 'DELETE' },
+    );
+  }
+
   streamMessage(sessionId: string, content: string): Promise<Response> {
     return fetch(`${API_URL}/sessions/${sessionId}/messages`, {
       method: 'POST',
