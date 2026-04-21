@@ -38,6 +38,8 @@ export class StartSandboxUseCase {
       projectId,
       status: created.status,
       previewUrl: created.previewUrl ?? null,
+      agentUrl: created.agentUrl ?? null,
+      agentToken: created.agentToken ?? null,
       createdAt: created.createdAt,
       stoppedAt: null,
     });

@@ -34,6 +34,8 @@ export class PrismaSandboxRepository extends SandboxRepository {
       update: {
         status: s.status,
         previewUrl: s.previewUrl,
+        agentUrl: s.agentUrl,
+        agentToken: s.agentToken,
         stoppedAt: s.stoppedAt,
       },
     });
@@ -48,6 +50,8 @@ export class PrismaSandboxRepository extends SandboxRepository {
     projectId: string;
     status: string;
     previewUrl: string | null;
+    agentUrl: string | null;
+    agentToken: string | null;
     createdAt: Date;
     stoppedAt: Date | null;
   }): SandboxEntity {
@@ -56,6 +60,8 @@ export class PrismaSandboxRepository extends SandboxRepository {
       projectId: row.projectId,
       status: row.status as SandboxStatus,
       previewUrl: row.previewUrl,
+      agentUrl: row.agentUrl,
+      agentToken: row.agentToken,
       createdAt: row.createdAt,
       stoppedAt: row.stoppedAt,
     });

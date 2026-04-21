@@ -18,13 +18,13 @@ export class SandboxesController {
   @Post()
   async start(@Param('projectId') projectId: string, @CurrentUser() user: AccessTokenPayload) {
     const sandbox = await this.startSandbox.execute(projectId, user.sub);
-    return { sandbox: sandbox.toObject() };
+    return { sandbox: sandbox.toPublic() };
   }
 
   @Get()
   async get(@Param('projectId') projectId: string, @CurrentUser() user: AccessTokenPayload) {
     const sandbox = await this.getSandbox.execute(projectId, user.sub);
-    return { sandbox: sandbox?.toObject() ?? null };
+    return { sandbox: sandbox?.toPublic() ?? null };
   }
 
   @Delete()

@@ -5,6 +5,8 @@ export interface SandboxProps {
   projectId: string;
   status: SandboxStatus;
   previewUrl: string | null;
+  agentUrl: string | null;
+  agentToken: string | null;
   createdAt: Date;
   stoppedAt: Date | null;
 }
@@ -32,6 +34,14 @@ export class SandboxEntity {
     return this.props.previewUrl;
   }
 
+  get agentUrl(): string | null {
+    return this.props.agentUrl;
+  }
+
+  get agentToken(): string | null {
+    return this.props.agentToken;
+  }
+
   get isActive(): boolean {
     return this.props.status === 'running' || this.props.status === 'creating';
   }
@@ -48,5 +58,11 @@ export class SandboxEntity {
 
   toObject(): SandboxProps {
     return { ...this.props };
+  }
+
+  /** Redacts the agent token — use when returning sandbox to the client. */
+  toPublic(): Omit<SandboxProps, 'agentToken'> {
+    const { agentToken: _, ...rest } = this.props;
+    return rest;
   }
 }

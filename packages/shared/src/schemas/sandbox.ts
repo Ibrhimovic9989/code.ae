@@ -26,6 +26,8 @@ export const SandboxSchema = z.object({
   projectId: z.string().uuid(),
   status: SandboxStatusSchema,
   previewUrl: z.string().url().optional(),
+  agentUrl: z.string().url().optional(),
+  agentToken: z.string().optional(),
   createdAt: z.date(),
   stoppedAt: z.date().optional(),
 });

@@ -1,6 +1,7 @@
 # syntax=docker/dockerfile:1.7
 # Base image for user project sandboxes.
-# Each running container is one user project's workspace, ephemeral and isolated.
+# Each running container = one user project's workspace, running the
+# code-ae sandbox-agent sidecar on :4200 + user's frontend/backend on 3000/4000.
 
 FROM node:22-bookworm-slim
 
@@ -21,9 +22,19 @@ RUN corepack enable && corepack prepare pnpm@9.12.0 --activate \
     && npm install -g bun@1.1.38
 
 RUN useradd -ms /bin/bash workspace
+
+# --- sandbox-agent sidecar -----------------------------------------------
+# Installed as root into /opt/agent, then we drop privileges to `workspace`.
+WORKDIR /opt/agent
+COPY sandbox-agent/package.json ./
+COPY sandbox-agent/dist ./dist
+RUN npm install --omit=dev --no-audit --no-fund \
+    && chown -R workspace:workspace /opt/agent
+
 USER workspace
+RUN mkdir -p /home/workspace/project
 WORKDIR /home/workspace/project
 
-EXPOSE 3000 4000
+EXPOSE 3000 4000 4200
 
-CMD ["bash", "-lc", "tail -f /dev/null"]
+CMD ["node", "/opt/agent/dist/main.js"]

@@ -1,8 +1,11 @@
 import { ContainerInstanceManagementClient } from '@azure/arm-containerinstance';
 import { DefaultAzureCredential } from '@azure/identity';
+import { randomBytes } from 'node:crypto';
 import { SandboxError, type Sandbox, type SandboxSpec, type SandboxStatus } from '@code-ae/shared';
 import type { OrchestratorConfig } from '../config.js';
 import type { SandboxDriver } from '../domain/sandbox-driver.js';
+
+const AGENT_PORT = 4200;
 
 export class AciSandboxDriver implements SandboxDriver {
   private readonly client: ContainerInstanceManagementClient;
@@ -17,6 +20,9 @@ export class AciSandboxDriver implements SandboxDriver {
   async create(spec: SandboxSpec): Promise<Sandbox> {
     const containerGroupName = `sbx-${spec.projectId.slice(0, 8)}-${Date.now().toString(36)}`;
     const dnsLabel = containerGroupName.toLowerCase();
+    const agentToken = randomBytes(32).toString('hex');
+
+    const portsWithAgent = Array.from(new Set([...spec.ports, AGENT_PORT]));
 
     const poller = await this.client.containerGroups.beginCreateOrUpdate(
       this.config.AZURE_RESOURCE_GROUP,
@@ -25,6 +31,7 @@ export class AciSandboxDriver implements SandboxDriver {
         location: this.config.AZURE_LOCATION,
         osType: 'Linux',
         restartPolicy: 'Never',
+        tags: { projectId: spec.projectId },
         imageRegistryCredentials: [
           {
             server: this.config.AZURE_ACR_LOGIN_SERVER,
@@ -39,25 +46,33 @@ export class AciSandboxDriver implements SandboxDriver {
             resources: {
               requests: { cpu: spec.cpuCores, memoryInGB: spec.memoryGb },
             },
-            ports: spec.ports.map((port) => ({ port, protocol: 'TCP' })),
+            ports: portsWithAgent.map((port) => ({ port, protocol: 'TCP' })),
+            environmentVariables: [
+              { name: 'SANDBOX_TOKEN', secureValue: agentToken },
+              { name: 'PORT', value: String(AGENT_PORT) },
+              { name: 'WORKSPACE_ROOT', value: '/home/workspace/project' },
+            ],
           },
         ],
         ipAddress: {
           type: 'Public',
           dnsNameLabel: dnsLabel,
-          ports: spec.ports.map((port) => ({ port, protocol: 'TCP' })),
+          ports: portsWithAgent.map((port) => ({ port, protocol: 'TCP' })),
         },
       },
     );
 
     const result = await poller.pollUntilDone();
     const fqdn = result.ipAddress?.fqdn;
+    const previewPort = spec.ports[0] ?? 3000;
 
     return {
       id: containerGroupName,
       projectId: spec.projectId,
       status: this.mapStatus(result.provisioningState),
-      previewUrl: fqdn ? `http://${fqdn}:${spec.ports[0] ?? 3000}` : undefined,
+      previewUrl: fqdn ? `http://${fqdn}:${previewPort}` : undefined,
+      agentUrl: fqdn ? `http://${fqdn}:${AGENT_PORT}` : undefined,
+      agentToken,
       createdAt: new Date(),
     };
   }

@@ -101,6 +101,8 @@ model Sandbox {
   project    Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
   status     String
   previewUrl String?
+  agentUrl   String?
+  agentToken String?
   createdAt  DateTime  @default(now())
   stoppedAt  DateTime?
 
