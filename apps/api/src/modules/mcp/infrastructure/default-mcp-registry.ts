@@ -22,10 +22,13 @@ export class DefaultMcpRegistry extends McpRegistry implements OnModuleInit, OnM
     super();
   }
 
-  async onModuleInit(): Promise<void> {
+  onModuleInit(): void {
+    // Fire-and-forget: MCP servers (npx-hosted ones in particular) can take
+    // 30-90s to download + initialize on first run. We don't block Nest's
+    // boot on that; tools become available once the handshake completes.
     const magicKey = this.config.get('MAGIC_MCP_API_KEY', { infer: true });
     if (magicKey) {
-      await this.register({
+      void this.register({
         id: 'magic',
         command: 'npx',
         args: ['-y', '@21st-dev/magic@latest', `API_KEY="${magicKey}"`],

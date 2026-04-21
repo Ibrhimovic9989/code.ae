@@ -16,9 +16,14 @@ export class StdioMcpTransport {
   private closedReason: string | null = null;
 
   constructor(spec: McpServerSpec) {
+    // Windows resolves `npx` via npx.cmd / npx.ps1, not a bare executable.
+    // Using shell: true makes spawn defer to the OS shell's PATH resolution,
+    // which works on both Windows (cmd.exe) and POSIX (sh) without per-platform
+    // branching.
     this.proc = spawn(spec.command, spec.args, {
       env: { ...process.env, ...(spec.env ?? {}) },
       stdio: ['pipe', 'pipe', 'pipe'],
+      shell: true,
     });
 
     this.proc.stdout.on('data', this.onStdout);
