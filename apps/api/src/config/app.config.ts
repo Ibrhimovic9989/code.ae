@@ -18,6 +18,8 @@ export const appConfigSchema = z.object({
   GITHUB_OAUTH_CLIENT_SECRET: z.string().min(1).optional(),
   GITHUB_OAUTH_REDIRECT_URL: z.string().url().default('http://localhost:4000/api/v1/auth/github/callback'),
   GITHUB_OAUTH_POST_REDIRECT: z.string().url().default('http://localhost:3000/dashboard'),
+
+  MAGIC_MCP_API_KEY: z.string().min(1).optional(),
 });
 
 export type AppConfig = z.infer<typeof appConfigSchema>;

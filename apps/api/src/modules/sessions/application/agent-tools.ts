@@ -1,6 +1,15 @@
 import type { AgentToolDefinition } from '@code-ae/agent-runtime';
 
 /**
+ * Combines the built-in workspace tools with any dynamically discovered MCP tools.
+ * MCP tools are prefixed `mcp__<server>__<tool>` so the dispatcher can route them
+ * back to the registry without ambiguity.
+ */
+export function buildAgentTools(mcpTools: AgentToolDefinition[] = []): AgentToolDefinition[] {
+  return [...AGENT_TOOLS, ...mcpTools];
+}
+
+/**
  * OpenAI-compatible tool schemas. Names and params deliberately mirror
  * the workspace use cases so the dispatcher is a 1:1 map.
  */

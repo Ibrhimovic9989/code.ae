@@ -13,7 +13,8 @@ import { ProjectRepository } from '../../projects/domain/project.repository';
 import { SessionRepository, MessageRepository } from '../domain/session.repository';
 import { MessageEntity, type MessageToolCall } from '../domain/message.entity';
 import { ToolDispatcher } from './tool-dispatcher';
-import { AGENT_TOOLS } from './agent-tools';
+import { buildAgentTools } from './agent-tools';
+import { McpRegistry } from '../../mcp/domain/mcp-registry';
 import type { AppConfig } from '../../../config/app.config';
 
 export type SessionStreamEvent =
@@ -44,6 +45,7 @@ export class SendMessageUseCase {
     private readonly sessions: SessionRepository,
     private readonly messages: MessageRepository,
     private readonly dispatcher: ToolDispatcher,
+    private readonly mcp: McpRegistry,
     config: ConfigService<AppConfig, true>,
   ) {
     this.endpoint = config.get('AZURE_OPENAI_ENDPOINT', { infer: true });
@@ -133,7 +135,8 @@ export class SendMessageUseCase {
       assistantTextBuffer = '';
       pendingToolCalls = [];
 
-      const stream = runner.run({ systemPrompt, messages: agentMessages, tools: AGENT_TOOLS });
+      const tools = buildAgentTools(this.mcp.listTools());
+      const stream = runner.run({ systemPrompt, messages: agentMessages, tools });
 
       for await (const ev of stream) {
         const out = this.translate(ev);

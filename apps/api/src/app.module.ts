@@ -8,6 +8,7 @@ import { SandboxesModule } from './modules/sandboxes/sandboxes.module';
 import { SecretsModule } from './modules/secrets/secrets.module';
 import { WorkspaceModule } from './modules/workspace/workspace.module';
 import { GitHubModule } from './modules/github/github.module';
+import { McpModule } from './modules/mcp/mcp.module';
 import { PrismaModule } from './infrastructure/prisma/prisma.module';
 import { appConfigSchema } from './config/app.config';
 
@@ -27,6 +28,7 @@ import { appConfigSchema } from './config/app.config';
     SecretsModule,
     WorkspaceModule,
     GitHubModule,
+    McpModule,
   ],
 })
 export class AppModule {}

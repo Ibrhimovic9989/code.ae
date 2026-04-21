@@ -26,6 +26,7 @@
     "@code-ae/shared": "workspace:*",
     "@code-ae/agent-runtime": "workspace:*",
     "@code-ae/templates": "workspace:*",
+    "@code-ae/mcp-client": "workspace:*",
     "argon2": "^0.41.1",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",

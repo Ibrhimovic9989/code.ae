@@ -32,6 +32,9 @@ importers:
       '@code-ae/agent-runtime':
         specifier: workspace:*
         version: link:../../packages/agent-runtime
+      '@code-ae/mcp-client':
+        specifier: workspace:*
+        version: link:../../packages/mcp-client
       '@code-ae/shared':
         specifier: workspace:*
         version: link:../../packages/shared
@@ -241,6 +244,15 @@ importers:
         specifier: ^3.24.1
         version: 3.25.76
     devDependencies:
+      typescript:
+        specifier: ^5.7.2
+        version: 5.9.3
+
+  packages/mcp-client:
+    devDependencies:
+      '@types/node':
+        specifier: ^22.10.5
+        version: 22.19.17
       typescript:
         specifier: ^5.7.2
         version: 5.9.3
