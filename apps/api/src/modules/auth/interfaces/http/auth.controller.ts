@@ -1,10 +1,11 @@
-import { Body, Controller, Post, Req, Res, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, NotFoundException, Post, Req, Res, UseGuards } from '@nestjs/common';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { RegisterUseCase } from '../../application/register.usecase';
 import { LoginUseCase } from '../../application/login.usecase';
 import { RefreshUseCase } from '../../application/refresh.usecase';
 import { LogoutUseCase } from '../../application/logout.usecase';
 import { JwtAuthService } from '../../infrastructure/jwt.service';
+import { UserRepository } from '../../domain/auth.repository';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { CurrentUser } from './current-user.decorator';
 import type { AccessTokenPayload } from '../../infrastructure/jwt.service';
@@ -19,7 +20,16 @@ export class AuthController {
     private readonly refresh: RefreshUseCase,
     private readonly logout: LogoutUseCase,
     private readonly jwt: JwtAuthService,
+    private readonly users: UserRepository,
   ) {}
+
+  @Get('me')
+  @UseGuards(JwtAuthGuard)
+  async me(@CurrentUser() payload: AccessTokenPayload) {
+    const user = await this.users.findById(payload.sub);
+    if (!user) throw new NotFoundException('User not found');
+    return { user: user.toPublic() };
+  }
 
   @Post('register')
   async postRegister(@Body() body: unknown) {

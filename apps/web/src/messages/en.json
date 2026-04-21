@@ -8,7 +8,8 @@
     "projects": "Projects",
     "settings": "Settings",
     "signIn": "Sign in",
-    "signUp": "Sign up"
+    "signUp": "Sign up",
+    "logout": "Logout"
   },
   "landing": {
     "heroTitle": "Build your app with AI",
@@ -16,16 +17,65 @@
     "ctaStart": "Get started",
     "ctaLearnMore": "Learn more"
   },
+  "auth": {
+    "loginTitle": "Welcome back",
+    "loginSubtitle": "Sign in to continue building your projects.",
+    "registerTitle": "Create your account",
+    "registerSubtitle": "Start shipping AI-powered projects today.",
+    "email": "Email",
+    "password": "Password",
+    "displayName": "Name",
+    "submitLogin": "Sign in",
+    "submitRegister": "Create account",
+    "haveAccount": "Have an account?",
+    "noAccount": "No account yet?",
+    "switchToLogin": "Sign in",
+    "switchToRegister": "Create one"
+  },
   "dashboard": {
     "title": "Your projects",
     "newProject": "New project",
-    "empty": "No projects yet. Start your first one."
+    "empty": "No projects yet. Start your first one.",
+    "openProject": "Open",
+    "createTitle": "New project",
+    "fields": {
+      "name": "Project name",
+      "slug": "Slug",
+      "description": "Description",
+      "template": "Template",
+      "visibility": "Visibility"
+    },
+    "visibility": {
+      "private": "Private",
+      "unlisted": "Unlisted",
+      "public": "Public"
+    },
+    "templates": {
+      "next-nest-monorepo": "Next.js + NestJS (recommended)",
+      "next-only": "Next.js only",
+      "nest-only": "NestJS only",
+      "blank": "Blank"
+    },
+    "create": "Create",
+    "cancel": "Cancel"
   },
-  "project": {
-    "preview": "Live preview",
-    "files": "Files",
+  "workspace": {
     "chat": "Chat",
-    "env": "Environment variables",
-    "databases": "Databases"
+    "files": "Files",
+    "preview": "Live preview",
+    "terminal": "Terminal",
+    "placeholder": "Ask the AI what you want to build…",
+    "send": "Send",
+    "thinking": "Thinking…",
+    "toolCall": "Tool call",
+    "toolResult": "Tool result",
+    "starting": "Spinning up your dev environment…",
+    "ready": "Environment ready",
+    "noPreview": "Preview will appear here once your dev server is running."
+  },
+  "errors": {
+    "generic": "Something went wrong.",
+    "unauthorized": "Session expired — please sign in again.",
+    "notFound": "Not found"
   }
 }

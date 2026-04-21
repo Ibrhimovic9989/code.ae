@@ -8,7 +8,8 @@
     "projects": "المشاريع",
     "settings": "الإعدادات",
     "signIn": "تسجيل الدخول",
-    "signUp": "إنشاء حساب"
+    "signUp": "إنشاء حساب",
+    "logout": "تسجيل الخروج"
   },
   "landing": {
     "heroTitle": "ابنِ تطبيقك بالذكاء الاصطناعي",
@@ -16,16 +17,65 @@
     "ctaStart": "ابدأ الآن",
     "ctaLearnMore": "اعرف المزيد"
   },
+  "auth": {
+    "loginTitle": "مرحبًا بعودتك",
+    "loginSubtitle": "سجّل دخولك لمتابعة بناء مشاريعك.",
+    "registerTitle": "أنشئ حسابك",
+    "registerSubtitle": "ابدأ بإنشاء مشاريعك الذكية.",
+    "email": "البريد الإلكتروني",
+    "password": "كلمة المرور",
+    "displayName": "الاسم",
+    "submitLogin": "دخول",
+    "submitRegister": "إنشاء الحساب",
+    "haveAccount": "لديك حساب؟",
+    "noAccount": "لا تملك حسابًا بعد؟",
+    "switchToLogin": "سجّل دخولك",
+    "switchToRegister": "أنشئ حسابًا"
+  },
   "dashboard": {
     "title": "مشاريعك",
     "newProject": "مشروع جديد",
-    "empty": "لا توجد مشاريع بعد. ابدأ مشروعك الأول."
+    "empty": "لا توجد مشاريع بعد. ابدأ مشروعك الأول.",
+    "openProject": "فتح",
+    "createTitle": "مشروع جديد",
+    "fields": {
+      "name": "اسم المشروع",
+      "slug": "المعرف (slug)",
+      "description": "الوصف",
+      "template": "القالب",
+      "visibility": "الخصوصية"
+    },
+    "visibility": {
+      "private": "خاص",
+      "unlisted": "غير مدرج",
+      "public": "عام"
+    },
+    "templates": {
+      "next-nest-monorepo": "Next.js + NestJS (موصى به)",
+      "next-only": "Next.js فقط",
+      "nest-only": "NestJS فقط",
+      "blank": "فارغ"
+    },
+    "create": "إنشاء",
+    "cancel": "إلغاء"
   },
-  "project": {
-    "preview": "المعاينة المباشرة",
-    "files": "الملفات",
+  "workspace": {
     "chat": "المحادثة",
-    "env": "متغيرات البيئة",
-    "databases": "قواعد البيانات"
+    "files": "الملفات",
+    "preview": "المعاينة المباشرة",
+    "terminal": "الطرفية",
+    "placeholder": "اطلب من الذكاء الاصطناعي ما تريد بناءه…",
+    "send": "إرسال",
+    "thinking": "يفكّر…",
+    "toolCall": "استدعاء أداة",
+    "toolResult": "نتيجة الأداة",
+    "starting": "جاري تهيئة بيئة التطوير…",
+    "ready": "البيئة جاهزة",
+    "noPreview": "المعاينة غير متوفرة حتى يتم تشغيل خادم التطوير."
+  },
+  "errors": {
+    "generic": "حدث خطأ غير متوقع.",
+    "unauthorized": "جلسة منتهية — يرجى تسجيل الدخول مجددًا.",
+    "notFound": "غير موجود"
   }
 }
