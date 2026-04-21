@@ -31,6 +31,7 @@ export function useSessionStream(
   const [error, setError] = useState<string | null>(null);
   const [turns, setTurns] = useState<ChatTurn[]>([]);
   const [sending, setSending] = useState(false);
+  const [lastTurnAt, setLastTurnAt] = useState<number>(0);
   const initialized = useRef(false);
 
   const bootstrap = useCallback(async () => {
@@ -87,12 +88,13 @@ export function useSessionStream(
           return next;
         });
         setSending(false);
+        setLastTurnAt(Date.now());
       }
     },
     [session, locale],
   );
 
-  return { project, session, status, error, turns, sending, send };
+  return { project, session, status, error, turns, sending, send, lastTurnAt };
 }
 
 function updateLastAssistant(

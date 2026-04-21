@@ -22,7 +22,7 @@ export default function ProjectWorkspacePage() {
   const slug = params?.slug ?? '';
   const locale = params?.locale ?? 'ar';
 
-  const { project, status: sessStatus, error, turns, sending, send } = useSessionStream(
+  const { project, status: sessStatus, error, turns, sending, send, lastTurnAt } = useSessionStream(
     slug,
     status === 'authenticated',
     (locale === 'en' ? 'en' : 'ar') as 'ar' | 'en',
@@ -95,7 +95,11 @@ export default function ProjectWorkspacePage() {
             </section>
             <section className="hidden min-h-0 grid-rows-[1fr_220px] gap-px bg-neutral-200 lg:grid dark:bg-neutral-800">
               <div className="min-h-0 bg-white dark:bg-neutral-950">
-                <EditorPanel projectId={project?.id ?? null} sandboxReady={sessStatus === 'ready'} />
+                <EditorPanel
+                  projectId={project?.id ?? null}
+                  sandboxReady={sessStatus === 'ready'}
+                  refreshSignal={lastTurnAt}
+                />
               </div>
               <div className="min-h-0">
                 <TerminalPanel projectId={project?.id ?? null} sandboxReady={sessStatus === 'ready'} />

@@ -12,11 +12,19 @@ import { useFiles } from './use-files';
 interface EditorPanelProps {
   projectId: string | null;
   sandboxReady: boolean;
+  refreshSignal?: number;
 }
 
-export function EditorPanel({ projectId, sandboxReady }: EditorPanelProps) {
+export function EditorPanel({ projectId, sandboxReady, refreshSignal }: EditorPanelProps) {
   const t = useTranslations();
   const { root, expand, collapse, refresh } = useFiles(projectId, sandboxReady);
+
+  useEffect(() => {
+    if (refreshSignal && refreshSignal > 0) {
+      void refresh('.');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [refreshSignal]);
 
   const [currentPath, setCurrentPath] = useState<string | null>(null);
   const [content, setContent] = useState('');
