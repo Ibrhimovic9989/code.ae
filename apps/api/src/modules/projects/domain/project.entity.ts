@@ -11,6 +11,7 @@ export interface ProjectProps {
   githubRepoUrl: string | null;
   vercelProjectId: string | null;
   vercelDeploymentUrl: string | null;
+  supabaseProjectRef: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -48,6 +49,11 @@ export class ProjectEntity {
   linkVercel(vercelProjectId: string, deploymentUrl: string): void {
     this.props.vercelProjectId = vercelProjectId;
     this.props.vercelDeploymentUrl = deploymentUrl;
+    this.props.updatedAt = new Date();
+  }
+
+  linkSupabase(projectRef: string | null): void {
+    this.props.supabaseProjectRef = projectRef;
     this.props.updatedAt = new Date();
   }
 

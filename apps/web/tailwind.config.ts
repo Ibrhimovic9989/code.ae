@@ -8,7 +8,7 @@ export default {
       fontFamily: {
         sans: ['var(--font-ui)', 'system-ui', 'sans-serif'],
         arabic: ['var(--font-arabic)', 'sans-serif'],
-        mono: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
+        mono: ['var(--font-mono)', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
       },
       colors: {
         brand: {
@@ -38,5 +38,5 @@ export default {
       },
     },
   },
-  plugins: [],
+  plugins: [require('@tailwindcss/typography')],
 } satisfies Config;

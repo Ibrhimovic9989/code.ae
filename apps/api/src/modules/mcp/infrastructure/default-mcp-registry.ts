@@ -3,9 +3,10 @@ import { ConfigService } from '@nestjs/config';
 import { McpClient, type McpServerSpec, type McpToolSchema } from '@code-ae/mcp-client';
 import type { AgentToolDefinition } from '@code-ae/agent-runtime';
 import type { AppConfig } from '../../../config/app.config';
-import { McpRegistry, type McpToolCallResult } from '../domain/mcp-registry';
+import { McpRegistry, type McpScope, type McpToolCallResult } from '../domain/mcp-registry';
 
 const PREFIX = 'mcp__';
+const SUPABASE_SERVER_ID = 'supabase';
 
 interface ConnectedServer {
   id: string;
@@ -13,22 +14,26 @@ interface ConnectedServer {
   tools: McpToolSchema[];
 }
 
+interface ProjectServer extends ConnectedServer {
+  /** Signature derived from the (projectRef + token prefix) so rotations trigger reconnect. */
+  signature: string;
+}
+
 @Injectable()
 export class DefaultMcpRegistry extends McpRegistry implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(DefaultMcpRegistry.name);
-  private readonly servers: ConnectedServer[] = [];
+  private readonly globalServers: ConnectedServer[] = [];
+  /** Key: `${projectId}:${serverId}`. */
+  private readonly projectServers = new Map<string, ProjectServer>();
 
   constructor(private readonly config: ConfigService<AppConfig, true>) {
     super();
   }
 
   onModuleInit(): void {
-    // Fire-and-forget: MCP servers (npx-hosted ones in particular) can take
-    // 30-90s to download + initialize on first run. We don't block Nest's
-    // boot on that; tools become available once the handshake completes.
     const magicKey = this.config.get('MAGIC_MCP_API_KEY', { infer: true });
     if (magicKey) {
-      void this.register({
+      void this.registerGlobal({
         id: 'magic',
         command: 'npx',
         args: ['-y', '@21st-dev/magic@latest', `API_KEY="${magicKey}"`],
@@ -39,22 +44,16 @@ export class DefaultMcpRegistry extends McpRegistry implements OnModuleInit, OnM
   }
 
   async onModuleDestroy(): Promise<void> {
-    for (const s of this.servers) s.client.close();
+    for (const s of this.globalServers) s.client.close();
+    for (const s of this.projectServers.values()) s.client.close();
   }
 
-  listTools(): AgentToolDefinition[] {
+  listTools(scope?: McpScope): AgentToolDefinition[] {
     const out: AgentToolDefinition[] = [];
-    for (const s of this.servers) {
-      for (const t of s.tools) {
-        out.push({
-          name: `${PREFIX}${s.id}__${t.name}`,
-          description: t.description ?? `[${s.id}] ${t.name}`,
-          parameters: (t.inputSchema ?? {
-            type: 'object',
-            properties: {},
-            additionalProperties: true,
-          }) as Record<string, unknown>,
-        });
+    for (const s of this.globalServers) this.appendTools(out, s);
+    if (scope?.projectId) {
+      for (const [key, s] of this.projectServers) {
+        if (key.startsWith(`${scope.projectId}:`)) this.appendTools(out, s);
       }
     }
     return out;
@@ -64,7 +63,11 @@ export class DefaultMcpRegistry extends McpRegistry implements OnModuleInit, OnM
     return name.startsWith(PREFIX);
   }
 
-  async callTool(name: string, input: Record<string, unknown>): Promise<McpToolCallResult> {
+  async callTool(
+    name: string,
+    input: Record<string, unknown>,
+    scope?: McpScope,
+  ): Promise<McpToolCallResult> {
     if (!this.isMcpToolName(name)) {
       return { ok: false, output: { error: `Not an MCP tool: ${name}` } };
     }
@@ -74,7 +77,9 @@ export class DefaultMcpRegistry extends McpRegistry implements OnModuleInit, OnM
     const serverId = suffix.slice(0, sep);
     const toolName = suffix.slice(sep + 2);
 
-    const server = this.servers.find((s) => s.id === serverId);
+    const server =
+      (scope?.projectId ? this.projectServers.get(`${scope.projectId}:${serverId}`) : undefined) ??
+      this.globalServers.find((s) => s.id === serverId);
     if (!server) return { ok: false, output: { error: `Unknown MCP server: ${serverId}` } };
 
     try {
@@ -96,12 +101,63 @@ export class DefaultMcpRegistry extends McpRegistry implements OnModuleInit, OnM
     }
   }
 
-  private async register(spec: McpServerSpec): Promise<void> {
+  async ensureSupabaseServer(projectId: string, accessToken: string, projectRef: string): Promise<void> {
+    const key = `${projectId}:${SUPABASE_SERVER_ID}`;
+    const signature = `${projectRef}:${accessToken.slice(0, 8)}`;
+    const existing = this.projectServers.get(key);
+    if (existing && existing.signature === signature) return;
+    if (existing) existing.client.close();
+
+    try {
+      const spec: McpServerSpec = {
+        id: SUPABASE_SERVER_ID,
+        command: 'npx',
+        args: ['-y', '@supabase/mcp-server-supabase@latest', `--project-ref=${projectRef}`],
+        env: { SUPABASE_ACCESS_TOKEN: accessToken },
+      };
+      const client = new McpClient(spec);
+      await client.initialize();
+      const tools = await client.listTools();
+      this.projectServers.set(key, { id: SUPABASE_SERVER_ID, client, tools, signature });
+      this.logger.log(`MCP: connected supabase for project ${projectId} (${tools.length} tools)`);
+    } catch (err) {
+      this.logger.warn(
+        `MCP: failed to connect supabase for project ${projectId}: ${
+          err instanceof Error ? err.message : err
+        }`,
+      );
+    }
+  }
+
+  async unregisterProjectServers(projectId: string): Promise<void> {
+    for (const [key, server] of this.projectServers) {
+      if (key.startsWith(`${projectId}:`)) {
+        server.client.close();
+        this.projectServers.delete(key);
+      }
+    }
+  }
+
+  private appendTools(out: AgentToolDefinition[], s: ConnectedServer): void {
+    for (const t of s.tools) {
+      out.push({
+        name: `${PREFIX}${s.id}__${t.name}`,
+        description: t.description ?? `[${s.id}] ${t.name}`,
+        parameters: (t.inputSchema ?? {
+          type: 'object',
+          properties: {},
+          additionalProperties: true,
+        }) as Record<string, unknown>,
+      });
+    }
+  }
+
+  private async registerGlobal(spec: McpServerSpec): Promise<void> {
     try {
       const client = new McpClient(spec);
       await client.initialize();
       const tools = await client.listTools();
-      this.servers.push({ id: spec.id, client, tools });
+      this.globalServers.push({ id: spec.id, client, tools });
       this.logger.log(`MCP: connected ${spec.id} (${tools.length} tools)`);
     } catch (err) {
       this.logger.warn(

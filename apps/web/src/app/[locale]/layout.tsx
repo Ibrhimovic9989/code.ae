@@ -1,19 +1,15 @@
 import { NextIntlClientProvider } from 'next-intl';
 import { getMessages, setRequestLocale } from 'next-intl/server';
 import { notFound } from 'next/navigation';
-import { Inter, Tajawal } from 'next/font/google';
+import { GeistSans } from 'geist/font/sans';
+import { GeistMono } from 'geist/font/mono';
+import { Tajawal } from 'next/font/google';
 import { Toaster } from 'sonner';
 import { LOCALE_DIRECTION, SUPPORTED_LOCALES, type Locale } from '@code-ae/shared';
 import { AuthProvider } from '../../lib/auth-context';
 import { ThemeProvider, themeBootstrapScript } from '../../lib/theme-context';
 import { Header } from '../../components/header';
 import '../globals.css';
-
-const inter = Inter({
-  subsets: ['latin'],
-  variable: '--font-inter',
-  display: 'swap',
-});
 
 const tajawal = Tajawal({
   subsets: ['arabic', 'latin'],
@@ -41,9 +37,35 @@ export default async function LocaleLayout({
   const dir = LOCALE_DIRECTION[locale as Locale];
 
   return (
-    <html lang={locale} dir={dir} className={`${inter.variable} ${tajawal.variable}`} suppressHydrationWarning>
+    <html
+      lang={locale}
+      dir={dir}
+      className={`${GeistSans.variable} ${GeistMono.variable} ${tajawal.variable}`}
+      suppressHydrationWarning
+    >
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeBootstrapScript }} />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.getRegistrations().then(function (regs) {
+                  var hadSw = regs.length > 0;
+                  regs.forEach(function (r) { r.unregister(); });
+                  if ('caches' in window) {
+                    caches.keys().then(function (keys) {
+                      return Promise.all(keys.map(function (k) { return caches.delete(k); }));
+                    }).then(function () {
+                      if (hadSw) location.reload();
+                    });
+                  } else if (hadSw) {
+                    location.reload();
+                  }
+                });
+              }
+            `,
+          }}
+        />
       </head>
       <body className="min-h-screen bg-white text-neutral-900 antialiased dark:bg-neutral-950 dark:text-neutral-50">
         <NextIntlClientProvider messages={messages}>

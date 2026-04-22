@@ -3,6 +3,7 @@ import { WriteFileUseCase } from '../../workspace/application/write-file.usecase
 import { ReadFileUseCase } from '../../workspace/application/read-file.usecase';
 import { ListFilesUseCase } from '../../workspace/application/list-files.usecase';
 import { ExecCommandUseCase } from '../../workspace/application/exec-command.usecase';
+import { McpRegistry } from '../../mcp/domain/mcp-registry';
 
 export interface ToolContext {
   projectId: string;
@@ -22,6 +23,7 @@ export class ToolDispatcher {
     private readonly readFile: ReadFileUseCase,
     private readonly listFiles: ListFilesUseCase,
     private readonly execCommand: ExecCommandUseCase,
+    private readonly mcp: McpRegistry,
   ) {}
 
   async dispatch(name: string, input: Record<string, unknown>, ctx: ToolContext): Promise<ToolDispatchResult> {
@@ -46,12 +48,15 @@ export class ToolDispatcher {
           return { ok: true, output: res };
         }
         case 'ask_user': {
-          // Pending — the user answers via a form; we'll persist the tool result
-          // on the next POST in toolResponses[]. We don't execute anything here.
           return { ok: true, pending: true, output: null };
         }
-        default:
+        default: {
+          if (this.mcp.isMcpToolName(name)) {
+            const result = await this.mcp.callTool(name, input, { projectId: ctx.projectId });
+            return { ok: result.ok, output: result.output };
+          }
           return { ok: false, output: { error: `Unknown tool: ${name}` } };
+        }
       }
     } catch (err) {
       return {

@@ -3,6 +3,7 @@ import { AuthModule } from '../auth/auth.module';
 import { ProjectsModule } from '../projects/projects.module';
 import { SandboxesModule } from '../sandboxes/sandboxes.module';
 import { WorkspaceModule } from '../workspace/workspace.module';
+import { SupabaseModule } from '../supabase/supabase.module';
 import { WriteFileUseCase } from '../workspace/application/write-file.usecase';
 import { ReadFileUseCase } from '../workspace/application/read-file.usecase';
 import { ListFilesUseCase } from '../workspace/application/list-files.usecase';
@@ -22,7 +23,7 @@ import { ToolDispatcher } from './application/tool-dispatcher';
 import { SessionsController } from './interfaces/http/sessions.controller';
 
 @Module({
-  imports: [AuthModule, ProjectsModule, SandboxesModule, WorkspaceModule],
+  imports: [AuthModule, ProjectsModule, SandboxesModule, WorkspaceModule, SupabaseModule],
   controllers: [SessionsController],
   providers: [
     { provide: SessionRepository, useClass: PrismaSessionRepository },

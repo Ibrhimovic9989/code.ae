@@ -15,6 +15,7 @@ import { MessageEntity, type MessageToolCall } from '../domain/message.entity';
 import { ToolDispatcher } from './tool-dispatcher';
 import { buildAgentTools } from './agent-tools';
 import { McpRegistry } from '../../mcp/domain/mcp-registry';
+import { SupabaseIntegrationRepository } from '../../supabase/domain/supabase-integration.repository';
 import type { AppConfig } from '../../../config/app.config';
 
 export type SessionStreamEvent =
@@ -46,6 +47,7 @@ export class SendMessageUseCase {
     private readonly messages: MessageRepository,
     private readonly dispatcher: ToolDispatcher,
     private readonly mcp: McpRegistry,
+    private readonly supabase: SupabaseIntegrationRepository,
     config: ConfigService<AppConfig, true>,
   ) {
     this.endpoint = config.get('AZURE_OPENAI_ENDPOINT', { infer: true });
@@ -120,13 +122,30 @@ export class SendMessageUseCase {
     const history = await this.messages.listBySession(session.id);
     const agentMessages: AgentMessage[] = history.map((m) => this.toAgentMessage(m));
 
+    const projectObj = project.toObject();
+
     const systemPrompt = buildSystemPrompt({
       projectName: project.slug,
       projectTemplate: 'next-nest-monorepo',
       userLocale,
       hasBackend: true,
       hasFrontend: true,
+      supabaseLinked: Boolean(projectObj.supabaseProjectRef),
     });
+
+    // If the project has Supabase linked and the user has a PAT on file, make
+    // sure the per-project Supabase MCP server is up. Fire-and-forget: failures
+    // shouldn't block the agent loop — tools simply won't be available.
+    if (projectObj.supabaseProjectRef) {
+      const integration = await this.supabase.findByUserId(ownerId);
+      if (integration) {
+        await this.mcp.ensureSupabaseServer(
+          project.id,
+          integration.accessToken,
+          projectObj.supabaseProjectRef,
+        );
+      }
+    }
 
     let assistantTextBuffer = '';
     let pendingToolCalls: MessageToolCall[] = [];
@@ -135,7 +154,7 @@ export class SendMessageUseCase {
       assistantTextBuffer = '';
       pendingToolCalls = [];
 
-      const tools = buildAgentTools(this.mcp.listTools());
+      const tools = buildAgentTools(this.mcp.listTools({ projectId: project.id }));
       const stream = runner.run({ systemPrompt, messages: agentMessages, tools });
 
       for await (const ev of stream) {

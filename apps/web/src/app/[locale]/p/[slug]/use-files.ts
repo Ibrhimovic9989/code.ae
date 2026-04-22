@@ -45,7 +45,28 @@ export function useFiles(projectId: string | null, sandboxReady: boolean) {
 
   useEffect(() => {
     if (!projectId || !sandboxReady) return;
-    void loadRoot();
+    let cancelled = false;
+    (async () => {
+      await loadRoot();
+      if (cancelled) return;
+      // Safety net: if the sandbox came up empty and the project has a GitHub
+      // repo pushed, auto-restore it. The API bails out if the workspace
+      // already has files, so it's safe to always call.
+      const current = rootRef.current;
+      if (current && (!current.children || current.children.length === 0)) {
+        try {
+          const res = await api.restoreFromGitHub(projectId);
+          if (!cancelled && res.restored) {
+            await loadRoot();
+          }
+        } catch {
+          /* ignore — surfaces nothing when no repo / no integration */
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [projectId, sandboxReady, loadRoot]);
 
   const expand = useCallback(

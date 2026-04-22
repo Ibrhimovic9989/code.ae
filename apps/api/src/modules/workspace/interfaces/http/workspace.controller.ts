@@ -10,6 +10,8 @@ import { DeleteFileUseCase } from '../../application/delete-file.usecase';
 import { MoveFileUseCase } from '../../application/move-file.usecase';
 import { ExecCommandUseCase } from '../../application/exec-command.usecase';
 import { StreamCommandUseCase } from '../../application/stream-command.usecase';
+import { HealPreviewUseCase } from '../../application/heal-preview.usecase';
+import { DetectErrorsUseCase } from '../../application/detect-errors.usecase';
 
 @Controller('projects/:projectId')
 @UseGuards(JwtAuthGuard)
@@ -22,7 +24,25 @@ export class WorkspaceController {
     private readonly moveFile: MoveFileUseCase,
     private readonly execCommand: ExecCommandUseCase,
     private readonly streamCommand: StreamCommandUseCase,
+    private readonly healPreview: HealPreviewUseCase,
+    private readonly detectErrors: DetectErrorsUseCase,
   ) {}
+
+  @Post('preview/heal')
+  async heal(
+    @Param('projectId') projectId: string,
+    @CurrentUser() user: AccessTokenPayload,
+  ) {
+    return this.healPreview.execute(projectId, user.sub);
+  }
+
+  @Post('preview/errors')
+  async errors(
+    @Param('projectId') projectId: string,
+    @CurrentUser() user: AccessTokenPayload,
+  ) {
+    return this.detectErrors.execute(projectId, user.sub);
+  }
 
   @Post('files')
   async write(

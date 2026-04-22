@@ -21,6 +21,6 @@ import { SecretsController } from './interfaces/http/secrets.controller';
     DeleteSecretUseCase,
     ResolveSecretsForSandboxUseCase,
   ],
-  exports: [ResolveSecretsForSandboxUseCase, SecretRepository, SecretStore],
+  exports: [ResolveSecretsForSandboxUseCase, UpsertSecretUseCase, SecretRepository, SecretStore],
 })
 export class SecretsModule {}

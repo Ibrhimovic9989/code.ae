@@ -17,9 +17,15 @@ export interface ApiUser {
 
 class ApiClient {
   private accessToken: string | null = null;
+  private onTokenRefresh: ((token: string | null) => void) | null = null;
+  private refreshPromise: Promise<string | null> | null = null;
 
   setAccessToken(token: string | null): void {
     this.accessToken = token;
+  }
+
+  setOnTokenRefresh(handler: ((token: string | null) => void) | null): void {
+    this.onTokenRefresh = handler;
   }
 
   get token(): string | null {
@@ -28,6 +34,28 @@ class ApiClient {
 
   get baseUrl(): string {
     return API_URL;
+  }
+
+  private async refreshAccessToken(): Promise<string | null> {
+    if (this.refreshPromise) return this.refreshPromise;
+    this.refreshPromise = (async () => {
+      try {
+        const res = await fetch(`${API_URL}/auth/refresh`, {
+          method: 'POST',
+          credentials: 'include',
+        });
+        if (!res.ok) return null;
+        const body = (await res.json()) as { accessToken: string };
+        this.accessToken = body.accessToken;
+        this.onTokenRefresh?.(body.accessToken);
+        return body.accessToken;
+      } catch {
+        return null;
+      } finally {
+        this.refreshPromise = null;
+      }
+    })();
+    return this.refreshPromise;
   }
 
   async register(input: {
@@ -71,6 +99,14 @@ class ApiClient {
 
   async getSandbox(projectId: string): Promise<{ sandbox: Sandbox | null }> {
     return this.request(`/projects/${projectId}/sandbox`, { method: 'GET' });
+  }
+
+  async startSandbox(projectId: string): Promise<{ sandbox: Sandbox }> {
+    return this.request(`/projects/${projectId}/sandbox`, { method: 'POST' });
+  }
+
+  async stopSandbox(projectId: string): Promise<void> {
+    await this.request(`/projects/${projectId}/sandbox`, { method: 'DELETE' });
   }
 
   async createSession(projectId: string): Promise<{ session: Session }> {
@@ -154,6 +190,15 @@ class ApiClient {
     return this.request('/auth/github/start', { method: 'GET' });
   }
 
+  async restoreFromGitHub(projectId: string): Promise<{
+    restored: boolean;
+    reason?: 'not-empty' | 'no-repo' | 'no-integration' | 'sandbox-unreachable' | 'clone-failed';
+    message?: string;
+    filesRestored?: number;
+  }> {
+    return this.request(`/projects/${projectId}/github/restore`, { method: 'POST' });
+  }
+
   async pushToGitHub(
     projectId: string,
     input: { repoName?: string; privateRepo?: boolean; commitMessage?: string } = {},
@@ -176,6 +221,49 @@ class ApiClient {
 
   async disconnectVercel(): Promise<void> {
     await this.request('/auth/vercel', { method: 'DELETE' });
+  }
+
+  async getSupabaseIntegration(): Promise<{
+    integration: { supabaseEmail: string | null; connectedAt: string } | null;
+  }> {
+    return this.request('/auth/supabase', { method: 'GET' });
+  }
+
+  async connectSupabase(accessToken: string): Promise<{ integration: { supabaseEmail: string | null } }> {
+    return this.request('/auth/supabase/connect', {
+      method: 'POST',
+      body: { accessToken },
+    });
+  }
+
+  async disconnectSupabase(): Promise<void> {
+    await this.request('/auth/supabase', { method: 'DELETE' });
+  }
+
+  async listSupabaseProjects(): Promise<{
+    projects: Array<{ ref: string; name: string; region: string; status: string }>;
+  }> {
+    return this.request('/auth/supabase/projects', { method: 'GET' });
+  }
+
+  async linkSupabaseProject(
+    projectId: string,
+    supabaseProjectRef: string,
+    dbPassword?: string,
+  ): Promise<{
+    projectId: string;
+    supabaseProjectRef: string;
+    supabaseUrl: string;
+    secretsWritten: string[];
+  }> {
+    return this.request(`/projects/${projectId}/supabase/link`, {
+      method: 'POST',
+      body: { supabaseProjectRef, ...(dbPassword ? { dbPassword } : {}) },
+    });
+  }
+
+  async unlinkSupabaseProject(projectId: string): Promise<void> {
+    await this.request(`/projects/${projectId}/supabase/link`, { method: 'DELETE' });
   }
 
   async publishProject(
@@ -211,6 +299,45 @@ class ApiClient {
     });
   }
 
+  async healPreview(
+    projectId: string,
+  ): Promise<{ healed: boolean; tookSeconds: number; reason?: string; detail: string }> {
+    return this.request(`/projects/${projectId}/preview/heal`, { method: 'POST' });
+  }
+
+  async detectPreviewErrors(projectId: string): Promise<{
+    errors: Array<{
+      kind:
+        | 'module-not-found'
+        | 'failed-to-compile'
+        | 'syntax-error'
+        | 'type-error'
+        | 'unhandled-runtime'
+        | 'enoent-manifest'
+        | 'internal-server-error'
+        | 'unknown';
+      message: string;
+      file?: string;
+      fingerprint: string;
+    }>;
+    logTail: string;
+    previewStatus: number | null;
+  }> {
+    return this.request(`/projects/${projectId}/preview/errors`, { method: 'POST' });
+  }
+
+  async exec(
+    projectId: string,
+    command: string,
+    cwd = '.',
+    timeoutMs?: number,
+  ): Promise<{ exitCode: number; stdout: string; stderr: string; timedOut?: boolean }> {
+    return this.request(`/projects/${projectId}/exec`, {
+      method: 'POST',
+      body: { command, cwd, ...(timeoutMs ? { timeoutMs } : {}) },
+    });
+  }
+
   streamExec(projectId: string, command: string, cwd = '.'): Promise<Response> {
     return fetch(`${API_URL}/projects/${projectId}/exec/stream`, {
       method: 'POST',
@@ -224,15 +351,24 @@ class ApiClient {
   }
 
   private async request<T>(path: string, opts: { method: string; body?: unknown }): Promise<T> {
-    const res = await fetch(`${API_URL}${path}`, {
-      method: opts.method,
-      credentials: 'include',
-      headers: {
-        ...(opts.body !== undefined ? { 'Content-Type': 'application/json' } : {}),
-        ...(this.accessToken ? { Authorization: `Bearer ${this.accessToken}` } : {}),
-      },
-      ...(opts.body !== undefined ? { body: JSON.stringify(opts.body) } : {}),
-    });
+    const doFetch = (): Promise<Response> =>
+      fetch(`${API_URL}${path}`, {
+        method: opts.method,
+        credentials: 'include',
+        headers: {
+          ...(opts.body !== undefined ? { 'Content-Type': 'application/json' } : {}),
+          ...(this.accessToken ? { Authorization: `Bearer ${this.accessToken}` } : {}),
+        },
+        ...(opts.body !== undefined ? { body: JSON.stringify(opts.body) } : {}),
+      });
+
+    let res = await doFetch();
+
+    // Auto-refresh on 401 for any endpoint except refresh itself.
+    if (res.status === 401 && !path.startsWith('/auth/refresh') && !path.startsWith('/auth/login')) {
+      const fresh = await this.refreshAccessToken();
+      if (fresh) res = await doFetch();
+    }
 
     const text = await res.text();
     let parsed: unknown = null;

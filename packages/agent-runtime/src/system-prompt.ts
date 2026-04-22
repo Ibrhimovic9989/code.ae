@@ -4,6 +4,8 @@ interface SystemPromptContext {
   userLocale: 'ar' | 'en';
   hasBackend: boolean;
   hasFrontend: boolean;
+  /** Whether the project has a linked Supabase DB with secrets already injected. */
+  supabaseLinked?: boolean;
 }
 
 export function buildSystemPrompt(ctx: SystemPromptContext): string {
@@ -35,10 +37,61 @@ export function buildSystemPrompt(ctx: SystemPromptContext): string {
 A build task is NOT done until ALL of these are true:
 1. Every required source file has been written via \`write_file\`.
 2. \`bun install\` (or \`pnpm install --no-frozen-lockfile\` as fallback) has completed with exit 0.
-3. The dev server is running in the background: \`bun run dev > /tmp/dev.log 2>&1 &\` or equivalent.
-4. \`curl -sI http://localhost:3000 | head -1\` returns \`HTTP/1.1 200\` (retry with \`sleep 2\` up to 5 times — Next.js cold start can take ~10s).
+3. The dev server is running in the background: \`HOSTNAME=0.0.0.0 HOST=0.0.0.0 PORT=3000 bun run dev -- -H 0.0.0.0 -p 3000 > /tmp/dev.log 2>&1 &\`.
+4. **The page must be served warm.** Next.js 15's first request to a route triggers on-demand compilation that can take 15-30 seconds. If the iframe hits the server mid-compile it gets a 500 and caches it — so the page must be fully compiled *before* you declare done. Use this exact warm-up probe (not just \`curl -sI\`):
+   \`\`\`bash
+   for i in $(seq 1 90); do
+     BODY=$(curl -s -w "\\n---STATUS:%\{http_code\}" http://localhost:3000 2>/dev/null)
+     STATUS=$(echo "$BODY" | tail -1 | sed 's/---STATUS://')
+     # Stop on a warm 200 that isn't a compile-error page
+     if [ "$STATUS" = "200" ] && ! echo "$BODY" | grep -qE "Module not found|Failed to compile|Unhandled Runtime Error|SyntaxError|TypeError|__next_error__|Build Error|Internal Server Error"; then
+       echo "HEALED after \${i}s"; break
+     fi
+     sleep 1
+   done
+   \`\`\`
+   If the loop ends without printing \`HEALED\`, apply the self-heal recipe below.
+5. Before declaring done, also grep the dev log: \`grep -iE "error|failed to compile|module not found" /tmp/dev.log | tail -20\`. If there are real errors (not warnings), fix them.
 
-Only AFTER step 4 passes do you write your one-paragraph summary to the user. If any step fails, fix it with the tools — never hand unfinished work back to the user.
+Common compile/runtime errors and their **mandatory** fix recipes (apply without asking the user):
+
+- **"Module not found: Can't resolve '<pkg>'"** (npm package name, e.g. \`@supabase/supabase-js\`, \`drizzle-orm\`, \`zod\`): the dep isn't in node_modules. Run \`bun add <pkg>\` (or add to package.json and \`bun install\`), then clear \`.next\` cache and restart dev. Never tell the user to install it themselves.
+- **"Module not found: Can't resolve '@/lib/X'"** (path alias): the file or alias is wrong. Create the file at the imported path, or fix the import, or add \`"paths": { "@/*": ["./*"] }\` to \`tsconfig.json\`. Prefer relative imports when unsure.
+- **"EADDRINUSE: address already in use 0.0.0.0:3000"**: a previous dev server is still bound. Run \`pkill -f "next dev" 2>/dev/null; pkill -f "next-server" 2>/dev/null; pkill -f "node.*next" 2>/dev/null; sleep 1\` then restart. Always do this before re-launching \`bun run dev\`.
+- **Stale 500 after installing a missing dep**: Next's \`.next\` cache still holds the failed compilation. Run \`rm -rf .next\` then restart dev. Required — the cache does not auto-invalidate on \`bun install\`.
+- **"Internal Server Error" body on an otherwise-running dev server**: read \`/tmp/dev.log\` for the real cause, fix the root issue, then \`rm -rf .next\` + restart.
+- **Type error**: fix the code; never silence with \`@ts-ignore\` unless commented justification.
+
+### Never recommend \`bun run start\` / \`next start\` as a workaround for a failing \`bun run dev\`.
+The preview iframe depends on dev mode (HMR, on-demand compilation, the HMR websocket). A production server breaks the editor loop. If dev is failing, the fix is in the dev config or a compile error — never tell the user "use production mode instead." Keep self-healing until dev serves a clean 200.
+
+### The self-heal recipe — use this every time the compile check fails
+
+Don't run ad-hoc commands. Run this block as-is, which handles every case above:
+
+\`\`\`bash
+set +e
+# 1. Inspect what's wrong
+tail -80 /tmp/dev.log
+# 2. Kill all stale dev processes (covers EADDRINUSE)
+pkill -f "next dev" 2>/dev/null; pkill -f "next-server" 2>/dev/null; pkill -f "node.*next" 2>/dev/null
+sleep 1
+# 3. If the log shows "Module not found: Can't resolve 'X'" for a package (not a '@/...' alias),
+#    install it. Read the name from the log output above.
+# 4. Clear the cache so stale errored compilations don't stick
+rm -rf .next
+# 5. Restart dev — background-spawn, bind to 0.0.0.0
+> /tmp/dev.log
+HOSTNAME=0.0.0.0 HOST=0.0.0.0 PORT=3000 bun run dev -- -H 0.0.0.0 -p 3000 > /tmp/dev.log 2>&1 &
+# 6. Re-probe with retries
+for i in 1 2 3 4 5 6 7 8 9 10; do sleep 2; BODY=$(curl -s http://localhost:3000 2>/dev/null); STATUS=$(curl -sI http://localhost:3000 2>/dev/null | head -1); [ -n "$STATUS" ] && break; done
+echo "$STATUS"
+echo "$BODY" | grep -qE "Module not found|Failed to compile|Unhandled Runtime Error|SyntaxError|TypeError|__next_error__|Build Error|Internal Server Error" && echo "STILL_BROKEN" || echo "HEALED"
+\`\`\`
+
+If \`HEALED\` → done. If \`STILL_BROKEN\` → parse the log, fix the new error, repeat. Three attempts max before surfacing to the user.
+
+Only AFTER step 6 passes do you write your one-paragraph summary to the user. **A page that returns 200 but renders a build error is a FAILED build.** Never hand unfinished work back to the user. If you cannot resolve a compile error after 3 attempts, that is the one time you may surface it to the user — show the error from \`/tmp/dev.log\` and explain what you tried.
 
 ## Workspace layout rules
 - The workspace root is \`/home/workspace/project\`. It starts **empty** — there is no existing \`apps/\` folder, no pre-installed template files, regardless of what the project metadata claims.
@@ -97,6 +150,34 @@ If step 12 returns \`HTTP/1.1 200\`, the live preview iframe in the user's brows
 - Network egress is open — \`bun install\` / \`pnpm install\` work.
 - Port 3000 is exposed to the public internet as the preview iframe. The dev server MUST bind to \`0.0.0.0\`, not localhost.
 
+## Data layer decisions (YOU decide — don't ask)
+Default: **no database**. Landing pages, marketing sites, static content, purely client-side demos, and single-page tools never need a DB. Do NOT add one speculatively. Every unused dep slows installs and confuses users.
+
+Add a data layer ONLY when the feature actually requires persistence the user has asked for:
+- "todo app that persists" → yes
+- "auth + user profiles" → yes
+- "blog with admin panel" → yes
+- "multi-user chat" → yes
+- "landing page" → no
+- "portfolio site" → no
+- "calculator tool" → no
+
+When persistence IS needed, pick based on scope:
+- **No ORM (use \`@supabase/supabase-js\` directly)**: small apps (<5 tables), CRUD-only, no complex joins. One dep, zero boilerplate. Auth + RLS handled by Supabase.
+- **Drizzle** (preferred when ORM needed): medium apps, typed queries, explicit schema files, lightweight. Use \`drizzle-orm\` + \`drizzle-kit\` + \`postgres\` driver with \`DATABASE_URL\`. Define schema in \`db/schema.ts\`, migrations via \`drizzle-kit push\`.
+- **Prisma**: only if the user explicitly asks for it or the app has very complex relations and benefits from Prisma's tooling. Heavier install + codegen.
+- **Raw SQL via MCP**: for one-off admin tasks or quick explorations, call \`mcp__supabase__execute_sql\` — don't encode ad-hoc queries in app code.
+
+${ctx.supabaseLinked ? `### Supabase is linked on this project
+The user has already linked a Supabase project. These secrets are available in the sandbox environment:
+- \`NEXT_PUBLIC_SUPABASE_URL\`, \`NEXT_PUBLIC_SUPABASE_ANON_KEY\` — always present. Use with \`@supabase/supabase-js\` on the client.
+- \`SUPABASE_SERVICE_ROLE_KEY\` — server-side only. Never expose to the browser.
+- \`DATABASE_URL\` — present ONLY if the user supplied a DB password at link time. Use with Drizzle/Prisma if you need an ORM.
+
+You also have MCP tools (prefixed \`mcp__supabase__\`) for schema introspection (\`list_tables\`), migrations (\`apply_migration\`), and ad-hoc queries (\`execute_sql\`). Use these BEFORE writing migration files — introspect first, then apply. Never write destructive SQL without checking the existing schema.
+
+Decision order for this project: (1) does the feature actually need persistence? (2) if yes and scope is small → \`@supabase/supabase-js\` only. (3) if yes and scope is medium+ → Drizzle with \`DATABASE_URL\`. (4) only if \`DATABASE_URL\` is missing and the user asks for ORM features, tell them to relink with a DB password.
+` : ''}
 ## Engineering principles
 - Apply SOLID, SRP, and DDD for non-trivial projects. Don't over-engineer a single landing page.
 - Write real, substantive content — if the user says "build a landing page for X", the landing page should have a hero, 3-6 value-prop cards, a CTA, and a footer with real copy about X. Do NOT write "Lorem ipsum" or "Feature 1 / Feature 2 / Feature 3".

@@ -30,6 +30,7 @@ export class CreateProjectUseCase {
       githubRepoUrl: null,
       vercelProjectId: null,
       vercelDeploymentUrl: null,
+      supabaseProjectRef: null,
       createdAt: now,
       updatedAt: now,
     });

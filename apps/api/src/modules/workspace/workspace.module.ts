@@ -14,6 +14,8 @@ import { DeleteFileUseCase } from './application/delete-file.usecase';
 import { MoveFileUseCase } from './application/move-file.usecase';
 import { ExecCommandUseCase } from './application/exec-command.usecase';
 import { StreamCommandUseCase } from './application/stream-command.usecase';
+import { HealPreviewUseCase } from './application/heal-preview.usecase';
+import { DetectErrorsUseCase } from './application/detect-errors.usecase';
 import { WorkspaceController } from './interfaces/http/workspace.controller';
 
 @Module({
@@ -30,7 +32,9 @@ import { WorkspaceController } from './interfaces/http/workspace.controller';
     MoveFileUseCase,
     ExecCommandUseCase,
     StreamCommandUseCase,
+    HealPreviewUseCase,
+    DetectErrorsUseCase,
   ],
-  exports: [ExecCommandUseCase, ResolveActiveSandbox, SandboxAgentClient],
+  exports: [ExecCommandUseCase, ResolveActiveSandbox, SandboxAgentClient, HealPreviewUseCase, DetectErrorsUseCase],
 })
 export class WorkspaceModule {}

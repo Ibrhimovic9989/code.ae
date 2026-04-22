@@ -9,6 +9,7 @@ import { StartGitHubOAuthUseCase } from './application/start-oauth.usecase';
 import { CompleteGitHubOAuthUseCase } from './application/complete-oauth.usecase';
 import { GetGitHubIntegrationUseCase } from './application/get-integration.usecase';
 import { PushWorkspaceUseCase } from './application/push-workspace.usecase';
+import { RestoreFromGitHubUseCase } from './application/restore-from-github.usecase';
 import { GitHubController } from './interfaces/http/github.controller';
 
 @Module({
@@ -20,6 +21,7 @@ import { GitHubController } from './interfaces/http/github.controller';
     CompleteGitHubOAuthUseCase,
     GetGitHubIntegrationUseCase,
     PushWorkspaceUseCase,
+    RestoreFromGitHubUseCase,
   ],
 })
 export class GitHubModule {}

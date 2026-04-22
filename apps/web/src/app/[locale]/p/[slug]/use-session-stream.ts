@@ -29,11 +29,19 @@ export interface ChatTurn {
   toolCalls: ChatToolCall[];
   askUser: PendingAskUser | null;
   pending: boolean;
+  /**
+   * Marks turns initiated by the error-watcher agent (not the human). Lets
+   * the chat panel render them with a distinctive "auto-fix" badge instead of
+   * the regular user bubble.
+   */
+  autoFix?: boolean;
 }
 
 export interface SendInput {
   content?: string;
   toolResponses?: Array<{ id: string; content: unknown }>;
+  /** Client-side metadata — never serialized to the API. */
+  meta?: { autoFix?: string };
 }
 
 export function useSessionStream(
@@ -106,10 +114,18 @@ export function useSessionStream(
         });
       }
 
+      const isAutoFix = Boolean(normalized.meta?.autoFix);
       setTurns((prev) => {
         const next = [...prev];
         if (content.trim()) {
-          next.push({ role: 'user', text: content, toolCalls: [], askUser: null, pending: false });
+          next.push({
+            role: 'user',
+            text: content,
+            toolCalls: [],
+            askUser: null,
+            pending: false,
+            autoFix: isAutoFix,
+          });
         }
         next.push({ role: 'assistant', text: '', toolCalls: [], askUser: null, pending: true });
         return next;

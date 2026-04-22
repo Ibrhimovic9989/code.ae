@@ -22,6 +22,7 @@ model User {
   refreshTokens RefreshToken[]
   github        GitHubIntegration?
   vercel        VercelIntegration?
+  supabase      SupabaseIntegration?
 }
 
 model GitHubIntegration {
@@ -44,6 +45,16 @@ model VercelIntegration {
   vercelUserId   String
   vercelUsername String
   teamId         String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model SupabaseIntegration {
+  id             String   @id @default(uuid()) @db.Uuid
+  userId         String   @unique @db.Uuid
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken    String
+  supabaseEmail  String?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 }
@@ -76,6 +87,7 @@ model Project {
   githubRepoUrl String?
   vercelProjectId     String?
   vercelDeploymentUrl String?
+  supabaseProjectRef  String?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
   sessions      Session[]

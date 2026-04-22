@@ -10,6 +10,7 @@ import { WorkspaceModule } from './modules/workspace/workspace.module';
 import { GitHubModule } from './modules/github/github.module';
 import { McpModule } from './modules/mcp/mcp.module';
 import { VercelModule } from './modules/vercel/vercel.module';
+import { SupabaseModule } from './modules/supabase/supabase.module';
 import { PrismaModule } from './infrastructure/prisma/prisma.module';
 import { appConfigSchema } from './config/app.config';
 
@@ -31,6 +32,7 @@ import { appConfigSchema } from './config/app.config';
     GitHubModule,
     McpModule,
     VercelModule,
+    SupabaseModule,
   ],
 })
 export class AppModule {}

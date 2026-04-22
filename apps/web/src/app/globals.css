@@ -3,22 +3,28 @@
 @tailwind utilities;
 
 :root {
-  --font-ui: var(--font-inter), 'Inter', system-ui, sans-serif;
+  --font-ui: var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
   --font-arabic: var(--font-tajawal), 'Tajawal', 'Cairo', system-ui, sans-serif;
   color-scheme: light dark;
 
   /* Surface layering — light */
   --surface-0: 255 255 255;
   --surface-1: 250 250 250;
-  --surface-2: 245 245 245;
-  --border: 229 229 229;
+  --surface-2: 244 244 245;
+  --border: 229 229 234;
+  --border-subtle: 235 235 240;
+  --accent: 13 148 136;
 }
 
 .dark {
+  /* Pure near-black surfaces — Vercel-style */
   --surface-0: 10 10 10;
-  --surface-1: 20 20 20;
-  --surface-2: 30 30 30;
+  --surface-1: 17 17 17;
+  --surface-2: 23 23 23;
   --border: 38 38 38;
+  --border-subtle: 28 28 28;
+  --accent: 45 212 191;
   color-scheme: dark;
 }
 
@@ -26,15 +32,63 @@ html {
   font-family: var(--font-ui);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: 'cv11', 'ss01', 'ss03';
+  letter-spacing: -0.01em;
+}
+
+body {
+  background-color: rgb(var(--surface-0));
+  color: rgb(24 24 27);
+}
+
+.dark body {
+  color: rgb(237 237 237);
 }
 
 html[dir='rtl'] {
   font-family: var(--font-arabic);
+  letter-spacing: 0;
 }
 
-/* Arabic font uses wider line-height for better readability */
 html[dir='rtl'] body {
   line-height: 1.65;
+}
+
+/* Pleasant kerning for small caps labels */
+.label-caps {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgb(115 115 115);
+}
+.dark .label-caps {
+  color: rgb(130 130 135);
+}
+
+/* Focus ring — subtle, not chunky */
+*:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 1px rgb(var(--surface-0)), 0 0 0 3px rgb(var(--accent) / 0.45);
+}
+
+/* Scrollbar styling — thin and unobtrusive */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgb(var(--border));
+  border: 2px solid transparent;
+  background-clip: padding-box;
+  border-radius: 8px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgb(var(--border-subtle));
+  background-clip: padding-box;
 }
 
 @layer utilities {
@@ -57,14 +111,31 @@ html[dir='rtl'] body {
     background-size: 800px 100%;
     @apply animate-shimmer rounded-md;
   }
+
+  .surface-0 {
+    background-color: rgb(var(--surface-0));
+  }
+  .surface-1 {
+    background-color: rgb(var(--surface-1));
+  }
+  .surface-2 {
+    background-color: rgb(var(--surface-2));
+  }
+  .border-hair {
+    border-color: rgb(var(--border));
+  }
+  .border-hair-subtle {
+    border-color: rgb(var(--border-subtle));
+  }
 }
 
-/* Sonner toast overrides to match theme */
+/* Sonner toast overrides — match the premium palette */
 [data-sonner-toaster] {
-  --normal-bg: rgb(var(--surface-0));
-  --normal-text: rgb(17 17 17);
+  --normal-bg: rgb(var(--surface-1));
+  --normal-text: rgb(24 24 27);
   --normal-border: rgb(var(--border));
+  --border-radius: 8px;
 }
 .dark [data-sonner-toaster] {
-  --normal-text: rgb(245 245 245);
+  --normal-text: rgb(237 237 237);
 }

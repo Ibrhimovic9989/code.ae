@@ -1,20 +1,44 @@
-import { forwardRef, type ButtonHTMLAttributes, type InputHTMLAttributes, type LabelHTMLAttributes, type HTMLAttributes } from 'react';
+import {
+  forwardRef,
+  type ButtonHTMLAttributes,
+  type InputHTMLAttributes,
+  type LabelHTMLAttributes,
+  type HTMLAttributes,
+} from 'react';
 import { cn } from '../lib/utils';
+
+type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger';
+type ButtonSize = 'sm' | 'md';
 
 export const Button = forwardRef<
   HTMLButtonElement,
-  ButtonHTMLAttributes<HTMLButtonElement> & { variant?: 'primary' | 'secondary' | 'ghost' | 'danger' }
->(function Button({ variant = 'primary', className, ...props }, ref) {
+  ButtonHTMLAttributes<HTMLButtonElement> & { variant?: ButtonVariant; size?: ButtonSize }
+>(function Button({ variant = 'secondary', size = 'md', className, ...props }, ref) {
   const base =
-    'inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-500 disabled:opacity-50 disabled:cursor-not-allowed';
-  const variants: Record<string, string> = {
-    primary: 'bg-brand-600 text-white hover:bg-brand-700',
-    secondary:
-      'border border-neutral-300 bg-white text-neutral-900 hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-50 dark:hover:bg-neutral-800',
-    ghost: 'text-neutral-700 hover:bg-neutral-100 dark:text-neutral-200 dark:hover:bg-neutral-800',
-    danger: 'bg-red-600 text-white hover:bg-red-700',
+    'relative inline-flex items-center justify-center gap-2 rounded-md font-medium transition-colors duration-150 focus-visible:outline-none disabled:opacity-50 disabled:cursor-not-allowed select-none';
+  const sizes: Record<ButtonSize, string> = {
+    sm: 'h-7 px-2.5 text-[12px]',
+    md: 'h-8 px-3 text-[13px]',
   };
-  return <button ref={ref} className={cn(base, variants[variant], className)} {...props} />;
+  const variants: Record<ButtonVariant, string> = {
+    // Primary: high-contrast near-white on near-black (Vercel's invert button)
+    primary:
+      'bg-neutral-900 text-white border border-neutral-900 hover:bg-neutral-800 dark:bg-white dark:text-neutral-900 dark:border-white dark:hover:bg-neutral-200',
+    // Secondary: thin border, transparent bg — the default
+    secondary:
+      'border border-neutral-200 bg-white text-neutral-900 hover:bg-neutral-50 dark:border-neutral-800 dark:bg-neutral-950 dark:text-neutral-100 dark:hover:bg-neutral-900',
+    ghost:
+      'text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900 dark:text-neutral-400 dark:hover:bg-neutral-900 dark:hover:text-neutral-100',
+    danger:
+      'bg-red-600 text-white border border-red-600 hover:bg-red-700 dark:bg-red-600 dark:hover:bg-red-500',
+  };
+  return (
+    <button
+      ref={ref}
+      className={cn(base, sizes[size], variants[variant], className)}
+      {...props}
+    />
+  );
 });
 
 export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement>>(
@@ -23,7 +47,8 @@ export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputE
       <input
         ref={ref}
         className={cn(
-          'block w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm shadow-sm placeholder:text-neutral-400 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-50',
+          'block h-8 w-full rounded-md border border-neutral-200 bg-white px-2.5 text-[13px] text-neutral-900 placeholder:text-neutral-400 focus:border-neutral-400 focus:outline-none transition-colors duration-150',
+          'dark:border-neutral-800 dark:bg-neutral-950 dark:text-neutral-100 dark:placeholder:text-neutral-600 dark:focus:border-neutral-600',
           className,
         )}
         {...props}
@@ -37,7 +62,10 @@ export const Label = forwardRef<HTMLLabelElement, LabelHTMLAttributes<HTMLLabelE
     return (
       <label
         ref={ref}
-        className={cn('block text-sm font-medium text-neutral-700 dark:text-neutral-200', className)}
+        className={cn(
+          'block text-[12px] font-medium text-neutral-600 dark:text-neutral-400',
+          className,
+        )}
         {...props}
       />
     );
@@ -48,7 +76,7 @@ export function Card({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
   return (
     <div
       className={cn(
-        'rounded-xl border border-neutral-200 bg-white p-6 shadow-sm dark:border-neutral-800 dark:bg-neutral-950',
+        'rounded-lg border border-neutral-200 bg-white p-6 dark:border-neutral-800 dark:bg-neutral-950',
         className,
       )}
       {...props}
@@ -59,7 +87,10 @@ export function Card({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
 export function Spinner({ className }: { className?: string }) {
   return (
     <span
-      className={cn('inline-block h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent', className)}
+      className={cn(
+        'inline-block h-3.5 w-3.5 animate-spin rounded-full border-[1.5px] border-current border-t-transparent',
+        className,
+      )}
       aria-hidden="true"
     />
   );
@@ -67,5 +98,13 @@ export function Spinner({ className }: { className?: string }) {
 
 export function ErrorText({ children }: { children: React.ReactNode }) {
   if (!children) return null;
-  return <p className="text-sm text-red-600 dark:text-red-400">{children}</p>;
+  return <p className="text-[12px] text-red-600 dark:text-red-400">{children}</p>;
+}
+
+export function Kbd({ children }: { children: React.ReactNode }) {
+  return (
+    <kbd className="inline-flex h-5 items-center rounded border border-neutral-200 bg-neutral-50 px-1.5 font-mono text-[11px] font-medium text-neutral-600 dark:border-neutral-800 dark:bg-neutral-900 dark:text-neutral-400">
+      {children}
+    </kbd>
+  );
 }

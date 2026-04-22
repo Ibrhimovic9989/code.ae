@@ -10,6 +10,7 @@ import { StartGitHubOAuthUseCase } from '../../application/start-oauth.usecase';
 import { CompleteGitHubOAuthUseCase } from '../../application/complete-oauth.usecase';
 import { GetGitHubIntegrationUseCase } from '../../application/get-integration.usecase';
 import { PushWorkspaceUseCase } from '../../application/push-workspace.usecase';
+import { RestoreFromGitHubUseCase } from '../../application/restore-from-github.usecase';
 import type { AppConfig } from '../../../../config/app.config';
 
 @Controller()
@@ -19,6 +20,7 @@ export class GitHubController {
     private readonly complete: CompleteGitHubOAuthUseCase,
     private readonly getIntegration: GetGitHubIntegrationUseCase,
     private readonly push: PushWorkspaceUseCase,
+    private readonly restore: RestoreFromGitHubUseCase,
     private readonly jwt: JwtAuthService,
     private readonly config: ConfigService<AppConfig, true>,
   ) {}
@@ -66,5 +68,14 @@ export class GitHubController {
       ...(body?.commitMessage ? { commitMessage: body.commitMessage } : {}),
     });
     return { ok: true, ...result };
+  }
+
+  @Post('projects/:projectId/github/restore')
+  @UseGuards(JwtAuthGuard)
+  async restoreRepo(
+    @Param('projectId') projectId: string,
+    @CurrentUser() user: AccessTokenPayload,
+  ) {
+    return this.restore.execute(projectId, user.sub);
   }
 }
