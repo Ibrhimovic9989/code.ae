@@ -45,27 +45,6 @@ export default async function LocaleLayout({
     >
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeBootstrapScript }} />
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              if ('serviceWorker' in navigator) {
-                navigator.serviceWorker.getRegistrations().then(function (regs) {
-                  var hadSw = regs.length > 0;
-                  regs.forEach(function (r) { r.unregister(); });
-                  if ('caches' in window) {
-                    caches.keys().then(function (keys) {
-                      return Promise.all(keys.map(function (k) { return caches.delete(k); }));
-                    }).then(function () {
-                      if (hadSw) location.reload();
-                    });
-                  } else if (hadSw) {
-                    location.reload();
-                  }
-                });
-              }
-            `,
-          }}
-        />
       </head>
       <body className="relative min-h-screen bg-[rgb(var(--surface-0))] text-neutral-100 antialiased">
         {/* Decorative global backdrop — matches landing */}
