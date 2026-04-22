@@ -67,8 +67,19 @@ export function useSessionStream(
       const p = projects.find((x) => x.slug === projectSlug);
       if (!p) throw new Error('Project not found');
       setProject(p);
+      // createSession is idempotent per project — it returns the existing
+      // active session if one exists, otherwise spins up a new sandbox. So on
+      // every page load we get the same session id back, and we can hydrate
+      // the chat UI from its stored message history.
       const { session } = await api.createSession(p.id);
       setSession(session);
+      try {
+        const { messages } = await api.listMessages(session.id);
+        const hydrated = hydrateTurnsFromHistory(messages);
+        if (hydrated.length > 0) setTurns(hydrated);
+      } catch {
+        /* history load failures shouldn't block the chat from starting */
+      }
       setStatus('ready');
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -231,4 +242,111 @@ function updateLastAssistant(
 
   next[next.length - 1] = updated;
   return next;
+}
+
+/**
+ * Convert the flat list of Message rows the API returns into the grouped
+ * ChatTurn[] the chat panel renders. The DB shape is role-by-role; the UI
+ * shape is one assistant turn per "assistant message + its tool results".
+ * Tool results (role='tool') are matched back to the assistant turn that
+ * issued them via toolCallId.
+ */
+function hydrateTurnsFromHistory(messages: Array<Record<string, unknown>>): ChatTurn[] {
+  const turns: ChatTurn[] = [];
+  let lastAssistant: ChatTurn | null = null;
+
+  for (const raw of messages) {
+    const role = String(raw['role'] ?? '');
+    const content = String(raw['content'] ?? '');
+
+    if (role === 'user') {
+      turns.push({ role: 'user', text: content, toolCalls: [], askUser: null, pending: false });
+      lastAssistant = null;
+      continue;
+    }
+
+    if (role === 'assistant') {
+      const toolCallsRaw = raw['toolCalls'] as Array<{
+        id?: string;
+        name?: string;
+        input?: Record<string, unknown>;
+      }> | null | undefined;
+      const toolCalls: ChatToolCall[] = (toolCallsRaw ?? [])
+        .filter((c) => c.name !== 'ask_user')
+        .map((c) => ({
+          id: String(c.id ?? ''),
+          name: String(c.name ?? 'unknown'),
+          input: c.input ?? {},
+          status: 'pending',
+          output: null,
+        }));
+
+      const askCall = (toolCallsRaw ?? []).find((c) => c.name === 'ask_user');
+      const askUser: PendingAskUser | null = askCall
+        ? {
+            callId: String(askCall.id ?? ''),
+            question: String((askCall.input as Record<string, unknown> | undefined)?.['question'] ?? ''),
+            options:
+              ((askCall.input as Record<string, unknown> | undefined)?.['options'] as Array<{
+                label: string;
+                description?: string;
+              }>) ?? [],
+            allowMultiple: Boolean(
+              (askCall.input as Record<string, unknown> | undefined)?.['allowMultiple'],
+            ),
+            allowFreeText:
+              (askCall.input as Record<string, unknown> | undefined)?.['allowFreeText'] !== false,
+            awaiting: false, // historical turns are never still awaiting
+          }
+        : null;
+
+      const turn: ChatTurn = {
+        role: 'assistant',
+        text: content,
+        toolCalls,
+        askUser,
+        pending: false,
+      };
+      turns.push(turn);
+      lastAssistant = turn;
+      continue;
+    }
+
+    if (role === 'tool' && lastAssistant) {
+      // Backfill the result onto the matching tool call on the last assistant turn.
+      const callId = String(raw['toolCallId'] ?? '');
+      const idx = lastAssistant.toolCalls.findIndex((tc) => tc.id === callId);
+      let parsedOutput: unknown = content;
+      try {
+        parsedOutput = JSON.parse(content);
+      } catch {
+        /* leave as string */
+      }
+      if (idx >= 0) {
+        const target = lastAssistant.toolCalls[idx];
+        if (target) {
+          const isFailed =
+            (parsedOutput &&
+              typeof parsedOutput === 'object' &&
+              'ok' in (parsedOutput as Record<string, unknown>) &&
+              (parsedOutput as Record<string, unknown>)['ok'] === false) ||
+            false;
+          lastAssistant.toolCalls[idx] = {
+            ...target,
+            status: isFailed ? 'failed' : 'ok',
+            output: parsedOutput,
+          };
+        }
+      } else if (lastAssistant.askUser && lastAssistant.askUser.callId === callId) {
+        // Answer to a historical ask_user.
+        const answer = parsedOutput as { choices?: string[]; text?: string } | undefined;
+        lastAssistant.askUser = {
+          ...lastAssistant.askUser,
+          answer: { choices: answer?.choices ?? [], text: answer?.text ?? '' },
+        };
+      }
+    }
+  }
+
+  return turns;
 }
