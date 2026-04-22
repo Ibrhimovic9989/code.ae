@@ -8,25 +8,25 @@ interface Props {
 export function Features({ locale, messages: m }: Props) {
   const isAr = locale === 'ar';
   return (
-    <section id="features" className="relative py-24 md:py-32">
-      <div className="mx-auto max-w-6xl px-5 sm:px-8">
+    <section id="features" className="relative py-16 sm:py-24 md:py-32">
+      <div className="mx-auto max-w-6xl px-4 sm:px-6 md:px-8">
         <div className="max-w-2xl">
-          <div className="font-mono text-[11.5px] uppercase tracking-[0.16em] text-brand-400">
+          <div className="font-mono text-[11px] uppercase tracking-[0.16em] text-brand-400 sm:text-[11.5px]">
             /features
           </div>
           <h2
-            className={`mt-3 text-balance text-[34px] font-semibold leading-[1.1] tracking-[-0.02em] text-white md:text-[44px] ${
+            className={`mt-3 text-balance text-[28px] font-semibold leading-[1.1] tracking-[-0.02em] text-white sm:text-[34px] md:text-[44px] ${
               isAr ? 'font-arabic' : ''
             }`}
           >
             {m.features.title}
           </h2>
-          <p className={`mt-4 max-w-xl text-[15px] text-neutral-400 ${isAr ? 'font-arabic' : ''}`}>
+          <p className={`mt-3 max-w-xl text-[14.5px] text-neutral-400 sm:mt-4 sm:text-[15px] ${isAr ? 'font-arabic' : ''}`}>
             {m.features.subtitle}
           </p>
         </div>
 
-        <div className="mt-12 grid grid-cols-1 gap-px overflow-hidden rounded-2xl ring-1 ring-inset ring-white/5 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="mt-10 grid grid-cols-1 gap-px overflow-hidden rounded-xl ring-1 ring-inset ring-white/5 sm:mt-12 sm:grid-cols-2 sm:rounded-2xl lg:grid-cols-3">
           {m.features.items.map((f, i) => (
             <FeatureCard key={i} index={i} locale={locale} {...f} />
           ))}
@@ -52,11 +52,11 @@ function FeatureCard({
   const isAr = locale === 'ar';
   return (
     <article
-      className="group relative bg-[rgb(var(--surface-2))] p-6 transition-colors hover:bg-[rgb(var(--surface-3))] md:p-8"
+      className="group relative bg-[rgb(var(--surface-2))] p-5 transition-colors hover:bg-[rgb(var(--surface-3))] sm:p-6 md:p-8"
       style={{ animationDelay: `${index * 60}ms` }}
     >
       {/* Corner accent */}
-      <div className="absolute right-5 top-5 font-mono text-[10.5px] uppercase tracking-[0.18em] text-brand-400/70">
+      <div className="absolute end-4 top-4 font-mono text-[10px] uppercase tracking-[0.18em] text-brand-400/70 sm:end-5 sm:top-5 sm:text-[10.5px]">
         {String(index + 1).padStart(2, '0')}
       </div>
 
@@ -68,13 +68,13 @@ function FeatureCard({
       </div>
 
       <h3
-        className={`mt-5 text-[20px] font-semibold leading-snug tracking-[-0.01em] text-white ${
+        className={`mt-4 text-[18px] font-semibold leading-snug tracking-[-0.01em] text-white sm:mt-5 sm:text-[20px] ${
           isAr ? 'font-arabic' : ''
         }`}
       >
         {title}
       </h3>
-      <p className={`mt-2.5 text-[14px] leading-relaxed text-neutral-400 ${isAr ? 'font-arabic' : ''}`}>
+      <p className={`mt-2 text-[13.5px] leading-relaxed text-neutral-400 sm:mt-2.5 sm:text-[14px] ${isAr ? 'font-arabic' : ''}`}>
         {body}
       </p>
     </article>

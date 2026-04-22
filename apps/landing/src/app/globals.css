@@ -97,11 +97,16 @@ body {
   transform: translateY(-2px);
 }
 
-/* Button — ghost/primary */
+/* Button — ghost/primary. 44px minimum height for mobile tap targets. */
 .btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
   background: white;
   color: black;
   padding: 0.625rem 1.125rem;
+  min-height: 44px;
   border-radius: 10px;
   font-weight: 500;
   font-size: 14px;
@@ -113,9 +118,17 @@ body {
   transform: translateY(-1px);
   box-shadow: 0 1px 0 rgba(255, 255, 255, 0.3) inset, 0 12px 30px rgba(255, 255, 255, 0.12);
 }
+.btn-primary:active {
+  transform: translateY(0);
+}
 .btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
   color: rgb(237 237 237);
   padding: 0.625rem 1.125rem;
+  min-height: 44px;
   border-radius: 10px;
   font-weight: 500;
   font-size: 14px;
@@ -127,6 +140,10 @@ body {
 .btn-ghost:hover {
   border-color: rgba(255, 255, 255, 0.25);
   background: rgba(255, 255, 255, 0.05);
+}
+
+@media (min-width: 640px) {
+  .btn-primary, .btn-ghost { min-height: 0; }
 }
 
 /* Code-line animated preview — pulses a prompt into code */

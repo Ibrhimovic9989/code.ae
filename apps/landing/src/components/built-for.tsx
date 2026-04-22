@@ -8,30 +8,30 @@ interface Props {
 export function BuiltFor({ locale, messages: m }: Props) {
   const isAr = locale === 'ar';
   return (
-    <section className="relative py-24 md:py-32">
-      <div className="mx-auto grid max-w-6xl grid-cols-1 gap-12 px-5 sm:px-8 md:grid-cols-[1.1fr_1fr] md:items-center">
+    <section className="relative py-16 sm:py-24 md:py-32">
+      <div className="mx-auto grid max-w-6xl grid-cols-1 gap-10 px-4 sm:gap-12 sm:px-6 md:grid-cols-[1.1fr_1fr] md:items-center md:px-8">
         <div>
-          <div className="font-mono text-[11.5px] uppercase tracking-[0.16em] text-brand-400">
+          <div className="font-mono text-[11px] uppercase tracking-[0.16em] text-brand-400 sm:text-[11.5px]">
             /gulf-native
           </div>
           <h2
-            className={`mt-3 text-balance text-[34px] font-semibold leading-[1.1] tracking-[-0.02em] text-white md:text-[44px] ${
+            className={`mt-3 text-balance text-[28px] font-semibold leading-[1.1] tracking-[-0.02em] text-white sm:text-[34px] md:text-[44px] ${
               isAr ? 'font-arabic' : ''
             }`}
           >
             {m.builtFor.title}
           </h2>
-          <p className={`mt-4 max-w-xl text-[15px] text-neutral-400 ${isAr ? 'font-arabic' : ''}`}>
+          <p className={`mt-3 max-w-xl text-[14.5px] text-neutral-400 sm:mt-4 sm:text-[15px] ${isAr ? 'font-arabic' : ''}`}>
             {m.builtFor.subtitle}
           </p>
 
-          <ul className="mt-8 space-y-3.5">
+          <ul className="mt-6 space-y-3 sm:mt-8 sm:space-y-3.5">
             {m.builtFor.items.map((item, i) => (
               <li key={i} className="flex items-start gap-3">
                 <span className="mt-1.5 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-brand-400/10 ring-1 ring-brand-400/30">
                   <span className="h-1.5 w-1.5 rounded-full bg-brand-400" />
                 </span>
-                <span className={`text-[15px] leading-relaxed text-neutral-200 ${isAr ? 'font-arabic' : ''}`}>
+                <span className={`text-[14px] leading-relaxed text-neutral-200 sm:text-[15px] ${isAr ? 'font-arabic' : ''}`}>
                   {item}
                 </span>
               </li>
@@ -40,7 +40,7 @@ export function BuiltFor({ locale, messages: m }: Props) {
         </div>
 
         {/* Map-like decorative panel */}
-        <div className="relative aspect-square max-w-md justify-self-center overflow-hidden rounded-2xl border border-white/10 bg-[rgb(var(--surface-2))]">
+        <div className="relative aspect-square w-full max-w-md justify-self-center overflow-hidden rounded-xl border border-white/10 bg-[rgb(var(--surface-2))] sm:rounded-2xl">
           <MapGrid />
           <Marker label="UAE North" top="44%" left="54%" pulse />
           <Marker label="Riyadh" top="56%" left="42%" />

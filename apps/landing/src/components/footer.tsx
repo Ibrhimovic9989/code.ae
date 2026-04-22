@@ -3,9 +3,9 @@ import type { Locale, Messages } from '@/lib/i18n';
 
 export function Footer({ locale, messages: m }: { locale: Locale; messages: Messages }) {
   return (
-    <footer className="hairline-t py-14">
-      <div className="mx-auto grid max-w-6xl grid-cols-2 gap-10 px-5 sm:px-8 md:grid-cols-[1.4fr_1fr_1fr_1fr]">
-        <div>
+    <footer className="hairline-t py-10 sm:py-14">
+      <div className="mx-auto grid max-w-6xl grid-cols-2 gap-8 px-4 sm:gap-10 sm:px-6 md:grid-cols-[1.4fr_1fr_1fr_1fr] md:px-8">
+        <div className="col-span-2 md:col-span-1">
           <Link href={`/${locale}`} className="flex items-center gap-2" dir="ltr">
             <span className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-white/5 ring-1 ring-white/10">
               <svg viewBox="0 0 20 20" className="h-3 w-3 text-brand-400" fill="none" stroke="currentColor" strokeWidth="1.6">
