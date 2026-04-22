@@ -1,0 +1,17 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "nextjs",
+  "installCommand": "cd ../.. && pnpm install --frozen-lockfile --filter @code-ae/landing...",
+  "buildCommand": "cd ../.. && pnpm --filter @code-ae/landing build",
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "X-Frame-Options", "value": "SAMEORIGIN" },
+        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
+        { "key": "X-Content-Type-Options", "value": "nosniff" }
+      ]
+    }
+  ],
+  "redirects": []
+}

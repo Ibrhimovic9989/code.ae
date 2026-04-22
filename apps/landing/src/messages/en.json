@@ -1,0 +1,114 @@
+{
+  "meta": {
+    "title": "Code.ae — Build software. In Arabic.",
+    "description": "The AI coding studio for Arabic speakers. Prompt in Arabic, ship production TypeScript, deploy to Vercel. Built for the Gulf."
+  },
+  "nav": {
+    "features": "Features",
+    "how": "How it works",
+    "pricing": "Pricing",
+    "signIn": "Sign in",
+    "start": "Start building"
+  },
+  "hero": {
+    "kicker": "Arabic-first AI coding platform",
+    "title1": "Build production software.",
+    "title2": "In Arabic.",
+    "subtitle": "A live sandbox in the Gulf. A bilingual agent that actually understands you. Prompt once, ship a Next.js app with Supabase, push to GitHub, deploy to Vercel.",
+    "ctaPrimary": "Start building — it's free",
+    "ctaSecondary": "See how it works",
+    "trust": "No credit card. Sandbox spins up in seconds."
+  },
+  "marquee": [
+    "Next.js 15",
+    "React 19",
+    "TypeScript",
+    "Supabase",
+    "Vercel deploy",
+    "GitHub",
+    "Azure sandbox",
+    "Arabic + English"
+  ],
+  "features": {
+    "title": "Everything you need to ship",
+    "subtitle": "One studio. Prompt, code, preview, and deploy — without leaving the browser.",
+    "items": [
+      {
+        "title": "An agent that thinks in Arabic",
+        "body": "Write your idea the way you'd say it. The agent replies in Arabic, writes code in English, and never loses the thread.",
+        "badge": "المميّز"
+      },
+      {
+        "title": "A live sandbox in UAE North",
+        "body": "Every project boots a fresh Linux sandbox next door — Azure Container Instances in UAE, single-digit latency across the Gulf.",
+        "badge": "Edge"
+      },
+      {
+        "title": "Supabase in one click",
+        "body": "Link a Supabase project and we inject the keys, mount the MCP tools, and let the agent design your schema in plain language.",
+        "badge": "Data"
+      },
+      {
+        "title": "Push to GitHub, publish to Vercel",
+        "body": "OAuth once. Every build lives in a repo you own; every deploy is a URL you can share.",
+        "badge": "Ship"
+      },
+      {
+        "title": "Real files. Real code.",
+        "body": "Monaco editor, real terminal, live preview. Inspect, override, commit — nothing is hidden behind a wall of UI.",
+        "badge": "Open"
+      },
+      {
+        "title": "Self-healing previews",
+        "body": "A watchdog agent auto-recovers crashed dev servers and fixes compile errors in the chat before they reach you.",
+        "badge": "Calm"
+      }
+    ]
+  },
+  "how": {
+    "title": "From idea to live URL in minutes",
+    "subtitle": "Three steps. No config files, no dev environment setup, no \"does it work on your machine\".",
+    "steps": [
+      {
+        "num": "01",
+        "title": "Describe it in Arabic",
+        "body": "\"ابني لي صفحة هبوط لعيادة أسنان مع نموذج حجز موعد\" — and the agent gets to work."
+      },
+      {
+        "num": "02",
+        "title": "Watch the app take shape",
+        "body": "Files appear in the tree, the preview compiles live, the terminal streams logs. Steer at any moment."
+      },
+      {
+        "num": "03",
+        "title": "Ship it",
+        "body": "Push to GitHub, deploy to Vercel, or connect your custom domain. The URL is yours."
+      }
+    ]
+  },
+  "builtFor": {
+    "title": "Built for the Gulf",
+    "subtitle": "Most AI coding tools assume you speak English, use Silicon Valley banks, and host in Virginia. We built the opposite.",
+    "items": [
+      "Arabic-first UX, RTL in every surface",
+      "Infrastructure in UAE North — your data doesn't leave the region",
+      "Bilingual agent trained to reason in both languages",
+      "Integration-ready with local providers"
+    ]
+  },
+  "cta": {
+    "title": "The coding studio the Gulf has been waiting for.",
+    "subtitle": "Free while we're in early access. Bring your project, bring your ideas — we'll bring the infrastructure.",
+    "button": "Start building"
+  },
+  "footer": {
+    "tag": "Built in the Gulf, for the Gulf.",
+    "product": "Product",
+    "company": "Company",
+    "legal": "Legal",
+    "productLinks": { "features": "Features", "how": "How it works", "pricing": "Pricing" },
+    "companyLinks": { "about": "About", "contact": "Contact", "careers": "Careers" },
+    "legalLinks": { "privacy": "Privacy", "terms": "Terms", "security": "Security" },
+    "copyright": "© 2026 Code.ae"
+  }
+}

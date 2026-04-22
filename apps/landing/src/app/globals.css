@@ -1,0 +1,159 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+  --surface: 10 10 10;
+  --surface-2: 17 17 17;
+  --surface-3: 23 23 23;
+  --border: 38 38 38;
+  --border-subtle: 28 28 28;
+  --accent: 45 212 191;
+}
+
+html {
+  font-feature-settings: 'cv11', 'ss01', 'ss03';
+  letter-spacing: -0.01em;
+  background: rgb(var(--surface));
+  color: rgb(237 237 237);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+html[dir='rtl'] {
+  letter-spacing: 0;
+}
+
+body {
+  overflow-x: hidden;
+}
+
+/* Grid dot background used in hero */
+.bg-dots {
+  background-image: radial-gradient(rgba(255, 255, 255, 0.06) 1px, transparent 1px);
+  background-size: 28px 28px;
+  background-position: 0 0;
+}
+
+/* Radial fade mask to soften edges of decorative backgrounds */
+.mask-radial-fade {
+  mask-image: radial-gradient(ellipse at center, black 40%, transparent 75%);
+  -webkit-mask-image: radial-gradient(ellipse at center, black 40%, transparent 75%);
+}
+
+/* Subtle top-to-bottom fade for the hero noise layer */
+.mask-fade-bottom {
+  mask-image: linear-gradient(to bottom, black 20%, transparent 95%);
+  -webkit-mask-image: linear-gradient(to bottom, black 20%, transparent 95%);
+}
+
+/* Crisp 1px border that respects the pixel grid */
+.hairline {
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+.hairline-t { border-top: 1px solid rgba(255, 255, 255, 0.06); }
+.hairline-b { border-bottom: 1px solid rgba(255, 255, 255, 0.06); }
+.hairline-l { border-left: 1px solid rgba(255, 255, 255, 0.06); }
+.hairline-r { border-right: 1px solid rgba(255, 255, 255, 0.06); }
+
+/* Gradient text for the headline accent line */
+.text-gradient {
+  background: linear-gradient(180deg, #ffffff 0%, rgb(180 180 180) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.text-gradient-brand {
+  background: linear-gradient(135deg, rgb(110 231 213) 0%, rgb(45 212 191) 50%, rgb(94 234 212) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* Conic glow behind hero — rendered with CSS only, no images */
+.glow-conic {
+  background: conic-gradient(
+    from 120deg at 50% 50%,
+    rgba(45, 212, 191, 0.15),
+    rgba(56, 189, 248, 0.12),
+    rgba(139, 92, 246, 0.1),
+    rgba(45, 212, 191, 0.15)
+  );
+  filter: blur(60px);
+}
+
+/* Card with faint edge highlight (Linear/Vercel style) */
+.card-surface {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.025) 0%, rgba(255, 255, 255, 0) 100%),
+    rgb(var(--surface-2));
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 14px;
+  transition: border-color 180ms ease, transform 180ms ease, background 180ms ease;
+}
+.card-surface:hover {
+  border-color: rgba(255, 255, 255, 0.12);
+  transform: translateY(-2px);
+}
+
+/* Button — ghost/primary */
+.btn-primary {
+  background: white;
+  color: black;
+  padding: 0.625rem 1.125rem;
+  border-radius: 10px;
+  font-weight: 500;
+  font-size: 14px;
+  letter-spacing: -0.01em;
+  transition: transform 160ms ease, background 160ms ease, box-shadow 160ms ease;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.25) inset, 0 8px 24px rgba(255, 255, 255, 0.08);
+}
+.btn-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.3) inset, 0 12px 30px rgba(255, 255, 255, 0.12);
+}
+.btn-ghost {
+  color: rgb(237 237 237);
+  padding: 0.625rem 1.125rem;
+  border-radius: 10px;
+  font-weight: 500;
+  font-size: 14px;
+  letter-spacing: -0.01em;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.02);
+  transition: border-color 160ms ease, background 160ms ease;
+}
+.btn-ghost:hover {
+  border-color: rgba(255, 255, 255, 0.25);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+/* Code-line animated preview — pulses a prompt into code */
+@keyframes blink {
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
+.caret::after {
+  content: '';
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  margin-inline-start: 2px;
+  background: rgb(var(--accent));
+  animation: blink 1s step-end infinite;
+  transform: translateY(2px);
+}
+
+/* Arabic-specific: line-height for legibility */
+html[dir='rtl'] body {
+  line-height: 1.7;
+}
+
+/* Respect user motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}
