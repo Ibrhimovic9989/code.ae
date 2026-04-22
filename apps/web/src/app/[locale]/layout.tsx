@@ -67,7 +67,9 @@ export default async function LocaleLayout({
           }}
         />
       </head>
-      <body className="min-h-screen bg-white text-neutral-900 antialiased dark:bg-neutral-950 dark:text-neutral-50">
+      <body className="relative min-h-screen bg-[rgb(var(--surface-0))] text-neutral-100 antialiased">
+        {/* Decorative global backdrop — matches landing */}
+        <div aria-hidden className="pointer-events-none fixed inset-x-0 top-0 -z-10 h-[60vh] bg-dots mask-fade-bottom opacity-40" />
         <NextIntlClientProvider messages={messages}>
           <ThemeProvider>
             <AuthProvider>
@@ -76,7 +78,7 @@ export default async function LocaleLayout({
               <Toaster
                 position={dir === 'rtl' ? 'bottom-left' : 'bottom-right'}
                 dir={dir}
-                richColors
+                theme="dark"
                 closeButton
                 toastOptions={{ duration: 3500 }}
               />

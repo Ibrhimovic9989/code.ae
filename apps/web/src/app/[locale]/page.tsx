@@ -5,23 +5,39 @@ export default function LandingPage() {
   const t = useTranslations();
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-4xl flex-col items-center justify-center px-6 text-center">
-      <p className="mb-4 text-sm font-medium text-brand-600">{t('brand.tagline')}</p>
-      <h1 className="mb-6 text-4xl font-bold leading-tight md:text-6xl">{t('landing.heroTitle')}</h1>
-      <p className="mb-10 max-w-2xl text-lg text-neutral-600 dark:text-neutral-300">
+    <main className="relative isolate mx-auto flex min-h-[calc(100vh-3rem)] max-w-5xl flex-col items-center justify-center overflow-hidden px-4 py-20 text-center">
+      <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 mask-radial-fade">
+        <div className="glow-conic absolute left-1/2 top-1/2 h-[90vmin] w-[90vmin] -translate-x-1/2 -translate-y-1/2 opacity-60" />
+      </div>
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 -z-10 bg-dots opacity-50 mask-fade-bottom"
+      />
+
+      <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-3 py-1 text-[11.5px] font-medium text-neutral-300 backdrop-blur">
+        <span className="relative flex h-1.5 w-1.5">
+          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-brand-400 opacity-70" />
+          <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-brand-400" />
+        </span>
+        {t('brand.tagline')}
+      </div>
+
+      <h1 className="mt-6 max-w-3xl text-balance text-[40px] font-semibold leading-[1.08] tracking-[-0.03em] sm:text-[56px] md:text-[68px]">
+        <span className="text-gradient">{t('landing.heroTitle')}</span>
+      </h1>
+
+      <p className="mt-5 max-w-xl text-balance text-[15px] leading-relaxed text-neutral-400 sm:text-[17px]">
         {t('landing.heroSubtitle')}
       </p>
-      <div className="flex gap-3">
-        <Link
-          href="/dashboard"
-          className="rounded-lg bg-brand-600 px-6 py-3 font-medium text-white transition hover:bg-brand-700"
-        >
+
+      <div className="mt-9 flex flex-wrap items-center justify-center gap-3">
+        <Link href="/dashboard" className="btn-primary">
           {t('landing.ctaStart')}
+          <svg viewBox="0 0 14 14" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="1.8">
+            <path d="M3 7h8M7 3l4 4-4 4" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
         </Link>
-        <Link
-          href="#learn"
-          className="rounded-lg border border-neutral-300 px-6 py-3 font-medium transition hover:bg-neutral-50 dark:border-neutral-700 dark:hover:bg-neutral-900"
-        >
+        <Link href="#learn" className="btn-ghost">
           {t('landing.ctaLearnMore')}
         </Link>
       </div>
