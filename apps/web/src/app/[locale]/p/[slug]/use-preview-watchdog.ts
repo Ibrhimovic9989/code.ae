@@ -92,18 +92,29 @@ export function usePreviewWatchdog({
     let cancelled = false;
     let probeTimer: ReturnType<typeof setTimeout> | null = null;
 
-    // Cross-origin iframes can't report load errors cleanly, but we can detect
-    // a server-side outage by asking our backend to probe. The backend hits
-    // http://localhost:3000 from inside the container — no CORS, accurate.
-    // We piggyback on the same /heal endpoint: it only does work if unhealthy,
-    // and returns quickly if already healthy (the first 120s probe loop breaks
-    // on the first clean 200).
+    // Cross-origin iframes can't report load errors cleanly, so we ask the
+    // backend to probe the sandbox from inside the container (no CORS,
+    // accurate). Use the read-only /preview/errors endpoint first; only call
+    // heal if the probe shows the preview is actually broken. Heal is
+    // destructive — it kills port 3000 and relaunches — so running it on a
+    // healthy sandbox used to surface false "port-stuck" failures.
     const probe = async () => {
-      if (cancelled || healingRef.current) return;
+      if (cancelled || healingRef.current || !projectId) return;
       setState('probing');
-      // The cheapest "is it healthy" signal we have is hitting heal itself and
-      // trusting its verdict. If it's already healthy the recipe no-ops fast.
-      await healNow();
+      try {
+        const { errors, previewStatus } = await api.detectPreviewErrors(projectId);
+        if (cancelled) return;
+        const healthy = previewStatus === 200 && errors.length === 0;
+        if (healthy) {
+          failuresRef.current = 0;
+          setState('healthy');
+        } else {
+          await healNow();
+        }
+      } catch {
+        // Backend probe failure is itself a signal something is wrong.
+        if (!cancelled) await healNow();
+      }
       if (cancelled) return;
       probeTimer = setTimeout(probe, probeIntervalMs);
     };

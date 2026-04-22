@@ -76,6 +76,19 @@ export class HealPreviewUseCase {
 cd /home/workspace/project 2>/dev/null || { echo "CAE_RESULT=no-workspace"; exit 0; }
 [ -f package.json ] || { echo "CAE_RESULT=no-package-json"; exit 0; }
 
+# Fast path: if the preview is already serving a clean 200, don't touch it.
+# This keeps the watchdog from destructively "healing" a healthy sandbox,
+# which itself was causing the port-3000-permanently-occupied toast (kill
+# stomps on the live dev server, port lingers, next probe declares stuck).
+STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 3 http://localhost:3000 2>/dev/null)
+if [ "$STATUS" = "200" ]; then
+  BODY=$(curl -s --max-time 3 http://localhost:3000 2>/dev/null)
+  if ! echo "$BODY" | grep -qE "Module not found|Failed to compile|Internal Server Error|ENOENT|Build Error"; then
+    echo "CAE_RESULT=healed in 0s (already-healthy)"
+    exit 0
+  fi
+fi
+
 # Install deps if node_modules missing
 if [ ! -d node_modules ]; then
   bun install --no-summary 2>&1 | tail -5 || { echo "CAE_RESULT=install-failed"; exit 0; }
