@@ -151,6 +151,36 @@ export class PreviewProxyController {
       return;
     }
 
+    // When the upstream returns HTML or JS, rewrite absolute URL paths so that
+    // `/_next/*` etc. resolve through the proxy instead of the API origin.
+    const contentType = (upstream.headers.get('content-type') ?? '').toLowerCase();
+    const needsRewrite =
+      contentType.includes('text/html') ||
+      contentType.includes('application/javascript') ||
+      contentType.includes('text/javascript') ||
+      contentType.includes('text/css');
+
+    if (needsRewrite) {
+      // Buffer the full body so we can string-replace.
+      const chunks: Uint8Array[] = [];
+      const reader = upstream.body.getReader();
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        chunks.push(value);
+      }
+      const buf = Buffer.concat(chunks.map((c) => Buffer.from(c)));
+      const body = buf.toString('utf8');
+      const prefix = `/api/v1/preview/${projectId}`;
+      const rewritten = this.rewriteAbsolutePaths(body, prefix);
+      const rewrittenBuf = Buffer.from(rewritten, 'utf8');
+      // Drop Content-Length if we changed size; Content-Type intact.
+      raw.removeHeader('content-length');
+      raw.end(rewrittenBuf);
+      return;
+    }
+
     const reader = upstream.body.getReader();
     try {
       while (true) {
@@ -161,6 +191,57 @@ export class PreviewProxyController {
     } finally {
       raw.end();
     }
+  }
+
+  /**
+   * Rewrite absolute-path URLs that Next dev emits in HTML / JS / CSS so they
+   * resolve through the proxy instead of the API origin.
+   *
+   * Covers the common Next.js static-chunk references. Skips already-prefixed
+   * paths and external URLs.
+   */
+  private rewriteAbsolutePaths(body: string, prefix: string): string {
+    // Already-prefixed guard — idempotent.
+    const isProxyPrefixed = (url: string) => url.startsWith(prefix);
+
+    // HTML attributes: src="/foo" href="/foo" action="/foo"
+    body = body.replace(
+      /\b(src|href|action|data-src|poster)=("|')\/([^"'/][^"']*)\2/g,
+      (_m, attr, quote, rest) => {
+        const full = '/' + rest;
+        if (isProxyPrefixed(full)) return `${attr}=${quote}${full}${quote}`;
+        return `${attr}=${quote}${prefix}${full}${quote}`;
+      },
+    );
+    // srcset entries
+    body = body.replace(
+      /\b(srcset|imagesrcset)=("|')([^"']+)\2/g,
+      (_m, attr, quote, value: string) => {
+        const rewritten = value
+          .split(',')
+          .map((entry) => {
+            const trimmed = entry.trim();
+            if (!trimmed.startsWith('/') || trimmed.startsWith(prefix) || trimmed.startsWith('//'))
+              return entry;
+            return ' ' + prefix + trimmed;
+          })
+          .join(',');
+        return `${attr}=${quote}${rewritten}${quote}`;
+      },
+    );
+    // JS/JSON literal paths that start with /_next/
+    body = body.replace(/(["'`])\/(_next\/)/g, (_m, quote, next) => `${quote}${prefix}/${next}`);
+    // JS/JSON webpack hot-update paths + runtime config
+    body = body.replace(/(["'`])\/(__nextjs_original-stack-frame|__nextjs_source-map|__nextjs_font)/g,
+      (_m, quote, rest) => `${quote}${prefix}/${rest}`,
+    );
+    // CSS url(/...)
+    body = body.replace(/url\((['"]?)\/([^'")]+)\1\)/g, (m, quote, rest) => {
+      const full = '/' + rest;
+      if (isProxyPrefixed(full) || full.startsWith('//')) return m;
+      return `url(${quote}${prefix}${full}${quote})`;
+    });
+    return body;
   }
 
   private readCookie(cookieHeader: string | undefined, name: string): string | undefined {
