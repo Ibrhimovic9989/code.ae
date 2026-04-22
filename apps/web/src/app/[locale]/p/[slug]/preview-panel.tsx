@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { Spinner } from '../../../../components/ui';
+import { api } from '../../../../lib/api-client';
 import { cn } from '../../../../lib/utils';
 import { usePreviewWatchdog } from './use-preview-watchdog';
 
@@ -20,8 +21,28 @@ const VIEWPORT_WIDTHS: Record<ViewportSize, string> = {
   mobile: '390px',
 };
 
+/**
+ * Browsers block HTTP iframes inside HTTPS pages (mixed content). Sandboxes
+ * run on plain HTTP at ACI, so we route the iframe through the API's HTTPS
+ * proxy (`/api/v1/preview/:projectId/`). The short-lived access token is
+ * attached once as a query param — the proxy sets a scoped cookie so that
+ * follow-up asset requests authenticate without URL pollution.
+ */
+function useProxiedPreviewUrl(projectId: string | null, previewUrl: string | null): string | null {
+  if (!projectId || !previewUrl) return null;
+  const apiBase = api.baseUrl; // e.g. https://code-ae-api.*.azurecontainerapps.io/api/v1
+  const token = api.token;
+  if (!apiBase.startsWith('https://') || !token) {
+    // Dev/localhost falls back to the raw URL. Mixed-content only applies to
+    // https parent + http iframe, so localhost-over-http is fine.
+    return previewUrl;
+  }
+  return `${apiBase}/preview/${projectId}/?t=${encodeURIComponent(token)}`;
+}
+
 export function PreviewPanel({ projectId, previewUrl, viewport = 'desktop' }: Props) {
   const [manualNonce, setManualNonce] = useState(0);
+  const iframeSrc = useProxiedPreviewUrl(projectId, previewUrl);
 
   // Silent watchdog: probes the preview health via the backend heal endpoint,
   // auto-recovers on failure, bumps healedNonce on successful heal so the
@@ -127,7 +148,7 @@ export function PreviewPanel({ projectId, previewUrl, viewport = 'desktop' }: Pr
           >
             <iframe
               key={nonce}
-              src={previewUrl}
+              src={iframeSrc ?? previewUrl}
               className="h-full w-full border-0"
               sandbox="allow-scripts allow-forms allow-same-origin"
               dir="ltr"

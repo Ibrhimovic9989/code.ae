@@ -17,10 +17,11 @@ import { StreamCommandUseCase } from './application/stream-command.usecase';
 import { HealPreviewUseCase } from './application/heal-preview.usecase';
 import { DetectErrorsUseCase } from './application/detect-errors.usecase';
 import { WorkspaceController } from './interfaces/http/workspace.controller';
+import { PreviewProxyController } from './interfaces/http/preview-proxy.controller';
 
 @Module({
   imports: [AuthModule, ProjectsModule, SandboxesModule],
-  controllers: [WorkspaceController],
+  controllers: [WorkspaceController, PreviewProxyController],
   providers: [
     { provide: SandboxRepository, useClass: PrismaSandboxRepository },
     { provide: SandboxAgentClient, useClass: HttpSandboxAgentClient },

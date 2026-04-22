@@ -19,7 +19,10 @@ RUN pnpm --filter @code-ae/orchestrator build
 FROM node:22-alpine AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
-COPY --from=build /repo/apps/orchestrator/dist ./dist
-COPY --from=build /repo/apps/orchestrator/node_modules ./node_modules
+RUN corepack enable && corepack prepare pnpm@9.12.0 --activate
+# Copy the entire repo so pnpm's workspace symlinks (apps/orchestrator/node_modules/*
+# → ../../node_modules/.pnpm/...) resolve correctly at runtime.
+COPY --from=build /repo /app
+WORKDIR /app/apps/orchestrator
 EXPOSE 4100
 CMD ["node", "dist/main.js"]
