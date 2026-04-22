@@ -91,16 +91,21 @@ export class AuthController {
   }
 
   private setRefreshCookie(reply: FastifyReply, token: string, expiresAt: Date): void {
+    // SameSite=None because web (vercel.app) and API (azurecontainerapps.io)
+    // live on different registrable domains — browsers drop Lax cookies on
+    // cross-site fetches, so every page reload hits /auth/refresh without
+    // the cookie and bounces the user to login. None + Secure is the
+    // correct combo for a credentialed cross-origin cookie.
     reply.header(
       'set-cookie',
-      `${REFRESH_COOKIE}=${token}; Path=/api/v1/auth; HttpOnly; Secure; SameSite=Lax; Expires=${expiresAt.toUTCString()}`,
+      `${REFRESH_COOKIE}=${token}; Path=/api/v1/auth; HttpOnly; Secure; SameSite=None; Expires=${expiresAt.toUTCString()}`,
     );
   }
 
   private clearRefreshCookie(reply: FastifyReply): void {
     reply.header(
       'set-cookie',
-      `${REFRESH_COOKIE}=; Path=/api/v1/auth; HttpOnly; Secure; SameSite=Lax; Max-Age=0`,
+      `${REFRESH_COOKIE}=; Path=/api/v1/auth; HttpOnly; Secure; SameSite=None; Max-Age=0`,
     );
   }
 
