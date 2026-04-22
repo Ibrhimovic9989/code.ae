@@ -350,6 +350,16 @@ class ApiClient {
     });
   }
 
+  /**
+   * Build the WS URL for the interactive pty. Access token rides on `?t=`
+   * because browsers can't set headers on the WebSocket handshake.
+   */
+  ptyWebSocketUrl(projectId: string): string | null {
+    if (!this.accessToken) return null;
+    const wsBase = API_URL.replace(/^http/, 'ws');
+    return `${wsBase}/projects/${projectId}/pty?t=${encodeURIComponent(this.accessToken)}`;
+  }
+
   private async request<T>(path: string, opts: { method: string; body?: unknown }): Promise<T> {
     const doFetch = (): Promise<Response> =>
       fetch(`${API_URL}${path}`, {

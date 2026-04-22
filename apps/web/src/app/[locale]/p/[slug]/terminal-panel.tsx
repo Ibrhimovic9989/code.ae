@@ -1,68 +1,57 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import '@xterm/xterm/css/xterm.css';
 import { api } from '../../../../lib/api-client';
-import { parseSseStream } from '../../../../lib/sse-client';
 import { cn } from '../../../../lib/utils';
 
 interface TerminalPanelProps {
   projectId: string | null;
   sandboxReady: boolean;
   onClose?: () => void;
+  /**
+   * Optional stream of text lines to write into the terminal as read-only
+   * activity (e.g. commands the agent is running). Each unique line is
+   * printed once. Does not participate in the interactive pty stream.
+   */
+  agentActivity?: string[];
 }
 
-export function TerminalPanel({ projectId, sandboxReady, onClose }: TerminalPanelProps) {
+type Status = 'idle' | 'connecting' | 'connected' | 'disconnected';
+
+/**
+ * Interactive terminal backed by a WebSocket pty on the sandbox. Each mounted
+ * panel opens one pty (bash, persistent state), proxied through the API.
+ *
+ * The sizing dance matters: xterm's renderer panics on a zero-sized container
+ * and its ResizeObserver then throws forever. We defer `term.open()` until
+ * the container actually has non-zero dimensions, and keep refitting via our
+ * own ResizeObserver. See the earlier "Cannot read properties of undefined
+ * (reading 'dimensions')" incident.
+ */
+export function TerminalPanel({
+  projectId,
+  sandboxReady,
+  onClose,
+  agentActivity,
+}: TerminalPanelProps) {
   const t = useTranslations();
   const containerRef = useRef<HTMLDivElement>(null);
-  const termRef = useRef<{
-    term: import('@xterm/xterm').Terminal;
-    fit: import('@xterm/addon-fit').FitAddon;
-    writeLine: (text: string) => void;
-    prompt: () => void;
-  } | null>(null);
-  const lineBufferRef = useRef<string>('');
-  const runningRef = useRef<boolean>(false);
-  const [booted, setBooted] = useState(false);
+  const termRef = useRef<import('@xterm/xterm').Terminal | null>(null);
+  const fitRef = useRef<import('@xterm/addon-fit').FitAddon | null>(null);
+  const wsRef = useRef<WebSocket | null>(null);
+  const [status, setStatus] = useState<Status>('idle');
+  const activityShownRef = useRef<Set<string>>(new Set());
 
-  const runCommand = useCallback(
-    async (command: string) => {
-      if (!projectId || !termRef.current) return;
-      const term = termRef.current;
-      runningRef.current = true;
-      try {
-        const res = await api.streamExec(projectId, command);
-        for await (const ev of parseSseStream(res)) {
-          const data = ev.data as { chunk?: string; exitCode?: number | null; message?: string };
-          if (ev.event === 'stdout' || ev.event === 'stderr') {
-            term.term.write((data.chunk ?? '').replace(/\n/g, '\r\n'));
-          } else if (ev.event === 'exit') {
-            if (data.exitCode !== 0 && data.exitCode !== null) {
-              term.term.write(`\r\n\x1b[31m[exit ${data.exitCode}]\x1b[0m`);
-            }
-          } else if (ev.event === 'error') {
-            term.term.write(`\r\n\x1b[31m[error] ${data.message ?? ''}\x1b[0m`);
-          }
-        }
-      } catch (err) {
-        term.term.write(`\r\n\x1b[31m[error] ${err instanceof Error ? err.message : String(err)}\x1b[0m`);
-      } finally {
-        runningRef.current = false;
-        term.term.write('\r\n');
-        term.prompt();
-      }
-    },
-    [projectId],
-  );
-
+  // --- Boot xterm and open the WS pty ------------------------------------
   useEffect(() => {
-    if (booted || !containerRef.current) return;
+    if (!projectId || !sandboxReady) return;
     let cancelled = false;
     let ro: ResizeObserver | null = null;
-    let disposeFn: (() => void) | null = null;
 
     (async () => {
+      if (!containerRef.current) return;
       const [{ Terminal }, { FitAddon }, { WebLinksAddon }] = await Promise.all([
         import('@xterm/xterm'),
         import('@xterm/addon-fit'),
@@ -70,27 +59,27 @@ export function TerminalPanel({ projectId, sandboxReady, onClose }: TerminalPane
       ]);
       if (cancelled || !containerRef.current) return;
 
-      // Wait until the container actually has non-zero dimensions before calling
-      // term.open(). Opening into a 0-sized container leaves xterm's internal
-      // render service un-initialised, and its internal ResizeObserver then
-      // throws "Cannot read properties of undefined (reading 'dimensions')"
-      // on the next resize event.
+      // Wait for the container to have real dimensions before opening. This is
+      // the fix for "terminal says connected but looks empty" — a zero-height
+      // grid cell or a drawer that hasn't animated in yet leaves xterm's
+      // renderer in an un-paintable state.
       await waitForDimensions(containerRef.current);
       if (cancelled || !containerRef.current) return;
 
       const term = new Terminal({
-        convertEol: true,
+        convertEol: false,
         cursorBlink: true,
         cursorStyle: 'bar',
         fontSize: 12.5,
-        fontFamily: 'var(--font-mono), ui-monospace, SFMono-Regular, Menlo, monospace',
+        fontFamily:
+          'var(--font-mono), ui-monospace, SFMono-Regular, Menlo, monospace',
         letterSpacing: 0,
         lineHeight: 1.4,
         theme: {
           background: '#0a0a0a',
           foreground: '#e5e5e5',
           cursor: '#2dd4bf',
-          selectionBackground: '#ffffff18',
+          selectionBackground: '#ffffff22',
           black: '#0a0a0a',
           brightBlack: '#525252',
         },
@@ -99,82 +88,144 @@ export function TerminalPanel({ projectId, sandboxReady, onClose }: TerminalPane
       term.loadAddon(fit);
       term.loadAddon(new WebLinksAddon());
       term.open(containerRef.current);
+      termRef.current = term;
+      fitRef.current = fit;
 
       const safeFit = () => {
         const el = containerRef.current;
-        if (!termRef.current || !el) return;
-        if (el.offsetWidth === 0 || el.offsetHeight === 0) return;
+        if (!el || el.offsetWidth === 0 || el.offsetHeight === 0) return;
         try {
           fit.fit();
         } catch {
-          /* xterm internals not ready — next tick will retry */
+          /* xterm internals not ready yet */
         }
       };
 
-      const prompt = () => term.write('\x1b[38;2;45;212;191m❯\x1b[0m ');
-
-      term.writeln('\x1b[2mcode.ae · bash · type a command\x1b[0m');
-      prompt();
-
-      const writeLine = (text: string) => term.writeln(text);
-
-      term.onData((input) => {
-        if (runningRef.current) return;
-        for (const ch of input) {
-          const code = ch.charCodeAt(0);
-          if (ch === '\r') {
-            const cmd = lineBufferRef.current.trim();
-            term.write('\r\n');
-            lineBufferRef.current = '';
-            if (cmd) void runCommand(cmd);
-            else prompt();
-          } else if (code === 0x7f) {
-            if (lineBufferRef.current.length > 0) {
-              lineBufferRef.current = lineBufferRef.current.slice(0, -1);
-              term.write('\b \b');
-            }
-          } else if (code === 0x03) {
-            term.write('^C\r\n');
-            lineBufferRef.current = '';
-            prompt();
-          } else if (code >= 32 && code < 127) {
-            lineBufferRef.current += ch;
-            term.write(ch);
-          }
-        }
-      });
-
-      termRef.current = { term, fit, writeLine, prompt };
-      setBooted(true);
+      // First fit on next paint so xterm has a chance to measure.
       requestAnimationFrame(safeFit);
-      setTimeout(() => {
-        try {
-          term.focus();
-        } catch {
-          /* noop */
-        }
-      }, 50);
-
-      ro = new ResizeObserver(() => safeFit());
+      ro = new ResizeObserver(() => {
+        safeFit();
+        sendResize();
+      });
       ro.observe(containerRef.current);
 
-      disposeFn = () => {
-        ro?.disconnect();
-        ro = null;
+      term.writeln('\x1b[2mcode.ae · bash · persistent shell\x1b[0m');
+
+      openPty();
+
+      function sendResize() {
+        const ws = wsRef.current;
+        const t = termRef.current;
+        if (!ws || !t || ws.readyState !== WebSocket.OPEN) return;
         try {
-          term.dispose();
+          ws.send(JSON.stringify({ type: 'resize', cols: t.cols, rows: t.rows }));
         } catch {
-          /* noop */
+          /* ignore */
         }
-      };
+      }
+
+      function openPty() {
+        const url = api.ptyWebSocketUrl(projectId!);
+        if (!url) {
+          term.writeln('\x1b[31m[not authenticated]\x1b[0m');
+          setStatus('disconnected');
+          return;
+        }
+        setStatus('connecting');
+        const ws = new WebSocket(url);
+        wsRef.current = ws;
+
+        ws.onopen = () => {
+          setStatus('connected');
+          sendResize();
+          // Nudge the shell to render its prompt immediately instead of
+          // waiting for a keystroke.
+          try {
+            ws.send(JSON.stringify({ type: 'input', data: '\n' }));
+          } catch {
+            /* ignore */
+          }
+        };
+        ws.onmessage = (ev) => {
+          let msg: { type?: string; data?: string; code?: number };
+          try {
+            msg = JSON.parse(String(ev.data));
+          } catch {
+            return;
+          }
+          if (msg.type === 'output' && typeof msg.data === 'string') {
+            term.write(msg.data);
+          } else if (msg.type === 'exit') {
+            term.write(`\r\n\x1b[33m[shell exited, code=${msg.code ?? 0}]\x1b[0m\r\n`);
+          }
+        };
+        ws.onclose = () => {
+          setStatus('disconnected');
+        };
+        ws.onerror = () => {
+          setStatus('disconnected');
+        };
+      }
+
+      term.onData((input) => {
+        const ws = wsRef.current;
+        if (!ws || ws.readyState !== WebSocket.OPEN) return;
+        try {
+          ws.send(JSON.stringify({ type: 'input', data: input }));
+        } catch {
+          /* ignore */
+        }
+      });
     })();
 
     return () => {
       cancelled = true;
-      disposeFn?.();
+      ro?.disconnect();
+      try {
+        wsRef.current?.close();
+      } catch {
+        /* ignore */
+      }
+      wsRef.current = null;
+      try {
+        termRef.current?.dispose();
+      } catch {
+        /* ignore */
+      }
       termRef.current = null;
+      fitRef.current = null;
     };
-  }, [booted, runCommand]);
+  }, [projectId, sandboxReady]);
+
+  // --- Mirror agent activity lines in dim style --------------------------
+  useEffect(() => {
+    const term = termRef.current;
+    if (!term || !agentActivity) return;
+    for (const line of agentActivity) {
+      if (activityShownRef.current.has(line)) continue;
+      activityShownRef.current.add(line);
+      // Print on a fresh line so we don't stomp the user's in-progress input.
+      term.write(`\r\n\x1b[2m· ${line}\x1b[0m\r\n`);
+    }
+  }, [agentActivity]);
+
+  const statusLabel =
+    status === 'connected'
+      ? 'connected'
+      : status === 'connecting'
+        ? 'connecting…'
+        : status === 'disconnected'
+          ? 'disconnected'
+          : sandboxReady
+            ? 'idle'
+            : 'waiting…';
+
+  const dotClass = cn('h-1.5 w-1.5 rounded-full', {
+    'bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.6)]': status === 'connected',
+    'bg-amber-400 animate-pulse': status === 'connecting' || (!sandboxReady && status === 'idle'),
+    'bg-red-400': status === 'disconnected',
+    'bg-neutral-500': status === 'idle' && sandboxReady,
+  });
 
   return (
     <div className="relative flex h-full flex-col bg-[#0a0a0a]">
@@ -184,19 +235,12 @@ export function TerminalPanel({ projectId, sandboxReady, onClose }: TerminalPane
       />
       <div className="relative flex h-7 shrink-0 items-center justify-between border-b border-neutral-900 bg-neutral-950/80 px-3 backdrop-blur-sm">
         <div className="flex items-center gap-2">
-          <span
-            className={cn(
-              'h-1.5 w-1.5 rounded-full',
-              sandboxReady ? 'bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.6)]' : 'bg-amber-400',
-            )}
-          />
+          <span className={dotClass} />
           <span className="label-caps text-neutral-300">{t('workspace.terminal')}</span>
           <span className="font-mono text-[10.5px] text-neutral-500">bash</span>
         </div>
         <div className="flex items-center gap-1.5">
-          <span className="font-mono text-[10.5px] text-neutral-500">
-            {sandboxReady ? 'connected' : 'waiting…'}
-          </span>
+          <span className="font-mono text-[10.5px] text-neutral-500">{statusLabel}</span>
           {onClose ? (
             <button
               onClick={onClose}
@@ -214,25 +258,19 @@ export function TerminalPanel({ projectId, sandboxReady, onClose }: TerminalPane
         ref={containerRef}
         className="relative flex-1 overflow-hidden px-2 py-1.5 cursor-text"
         dir="ltr"
-        onClick={() => termRef.current?.term.focus()}
+        onClick={() => termRef.current?.focus()}
       />
     </div>
   );
 }
 
-async function waitForDimensions(el: HTMLElement, timeoutMs = 2000): Promise<void> {
+async function waitForDimensions(el: HTMLElement, timeoutMs = 3000): Promise<void> {
   if (el.offsetWidth > 0 && el.offsetHeight > 0) return;
   return new Promise<void>((resolve) => {
     const start = Date.now();
     const check = () => {
-      if (el.offsetWidth > 0 && el.offsetHeight > 0) {
-        resolve();
-        return;
-      }
-      if (Date.now() - start > timeoutMs) {
-        resolve();
-        return;
-      }
+      if (el.offsetWidth > 0 && el.offsetHeight > 0) return resolve();
+      if (Date.now() - start > timeoutMs) return resolve();
       requestAnimationFrame(check);
     };
     check();

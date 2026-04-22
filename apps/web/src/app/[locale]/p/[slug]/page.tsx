@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useAuth } from '../../../../lib/auth-context';
@@ -75,6 +75,23 @@ export default function ProjectWorkspacePage() {
   }, [sessStatus, project]);
 
   const sandboxReadyForWatcher = sessStatus === 'ready';
+
+  // Flat list of shell commands the agent has run, in order. The terminal
+  // panel dedupes + prints each one as read-only activity so the user can
+  // see what the agent is doing even while they have their own pty open.
+  const agentActivity = useMemo(() => {
+    const lines: string[] = [];
+    for (const turn of turns) {
+      if (turn.role !== 'assistant') continue;
+      for (const tc of turn.toolCalls) {
+        if (tc.name === 'exec') {
+          const cmd = (tc.input as { command?: string }).command;
+          if (cmd) lines.push(`$ ${cmd}`);
+        }
+      }
+    }
+    return lines;
+  }, [turns]);
 
   useErrorWatcher({
     projectId: project?.id ?? null,
@@ -237,6 +254,7 @@ export default function ProjectWorkspacePage() {
                           projectId={project?.id ?? null}
                           sandboxReady={sandboxReady}
                           onClose={() => setTermOpen(false)}
+                          agentActivity={agentActivity}
                         />
                       </div>
                     ) : (
@@ -306,6 +324,7 @@ export default function ProjectWorkspacePage() {
                     projectId={project?.id ?? null}
                     sandboxReady={sandboxReady}
                     onClose={() => setTermSheetOpen(false)}
+                    agentActivity={agentActivity}
                   />
                 </div>
               </div>
