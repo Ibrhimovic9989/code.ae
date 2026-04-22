@@ -18,7 +18,8 @@ import { useSessionStream } from './use-session-stream';
 import { useErrorWatcher } from './use-error-watcher';
 import { cn } from '../../../../lib/utils';
 
-type RightView = 'code' | 'preview';
+type MobileView = 'chat' | 'code' | 'preview';
+type DesktopView = 'code' | 'preview';
 
 export default function ProjectWorkspacePage() {
   const t = useTranslations();
@@ -35,9 +36,19 @@ export default function ProjectWorkspacePage() {
   );
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [secretsOpen, setSecretsOpen] = useState(false);
-  const [rightView, setRightView] = useState<RightView>('code');
-  const [termOpen, setTermOpen] = useState(true);
+  const [rightView, setRightView] = useState<DesktopView>('code');
+  const [mobileView, setMobileView] = useState<MobileView>('chat');
+  const [termOpen, setTermOpen] = useState(false); // mobile default: closed; desktop we flip below
+  const [termSheetOpen, setTermSheetOpen] = useState(false); // mobile-only modal terminal
+  const [overflowOpen, setOverflowOpen] = useState(false);
   const [viewport, setViewport] = useState<ViewportSize>('desktop');
+
+  // On larger screens, open the terminal by default so it feels like an IDE.
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.matchMedia('(min-width: 1024px)').matches) {
+      setTermOpen(true);
+    }
+  }, []);
 
   useEffect(() => {
     if (status === 'unauthenticated') router.replace(`/${locale}/login`);
@@ -63,18 +74,8 @@ export default function ProjectWorkspacePage() {
     };
   }, [sessStatus, project]);
 
-  // Auto-switch to preview once the dev server is up
-  useEffect(() => {
-    if (previewUrl && rightView === 'code') {
-      // Don't force-switch; user may be editing. Just nudge on first appearance.
-    }
-  }, [previewUrl, rightView]);
-
   const sandboxReadyForWatcher = sessStatus === 'ready';
 
-  // Background error-watcher agent: polls the dev log for build/runtime errors
-  // and auto-submits a fix request to the chat agent. Surfaces as a turn with
-  // an "auto-fix agent" badge so users see it acting on their behalf.
   useErrorWatcher({
     projectId: project?.id ?? null,
     sandboxReady: sandboxReadyForWatcher,
@@ -95,42 +96,93 @@ export default function ProjectWorkspacePage() {
           <p className="text-sm text-neutral-500">{t('workspace.starting')}</p>
         </div>
       ) : sessStatus === 'error' ? (
-        <div className="flex h-full items-center justify-center">
-          <div className="max-w-md rounded-lg border border-red-200 bg-red-50 p-6 text-red-900 dark:border-red-900 dark:bg-red-950 dark:text-red-100">
+        <div className="flex h-full items-center justify-center px-4">
+          <div className="max-w-md rounded-lg border border-red-900/50 bg-red-950/30 p-6 text-red-100">
             <p className="font-semibold">{t('errors.generic')}</p>
             <p className="mt-2 text-sm">{error}</p>
           </div>
         </div>
       ) : (
         <>
-          {/* Top bar */}
-          <div className="flex h-11 items-center gap-3 border-b border-neutral-200 bg-white px-4 text-[13px] dark:border-neutral-900 dark:bg-neutral-950">
-            <span className="font-medium text-neutral-900 dark:text-neutral-100">{project?.name}</span>
-            <span className="font-mono text-[11px] text-neutral-400 dark:text-neutral-600" dir="ltr">
+          {/* Top bar — collapses into project name + overflow on mobile */}
+          <div className="flex h-11 items-center gap-2 border-b border-white/5 bg-[rgb(var(--surface-0))] px-3 text-[13px] sm:gap-3 sm:px-4">
+            <span className="truncate font-medium text-neutral-100">{project?.name}</span>
+            <span className="hidden truncate font-mono text-[11px] text-neutral-500 sm:inline" dir="ltr">
               {project?.slug}
             </span>
             <div className="flex-1" />
-            <div className="flex items-center gap-1.5">
+            {/* Desktop: full toolbar */}
+            <div className="hidden items-center gap-1.5 md:flex">
               <GitHubPushButton projectId={project?.id ?? null} projectSlug={project?.slug ?? null} />
               <SupabaseButton projectId={project?.id ?? null} />
               <PublishButton projectId={project?.id ?? null} />
-              <div className="mx-0.5 h-4 w-px bg-neutral-200 dark:bg-neutral-800" />
+              <div className="mx-0.5 h-4 w-px bg-white/10" />
               <Button variant="ghost" size="sm" onClick={() => setSecretsOpen(true)}>
                 {t('workspace.env')}
               </Button>
             </div>
+            {/* Mobile: overflow trigger */}
+            <button
+              onClick={() => setOverflowOpen((v) => !v)}
+              aria-label="More actions"
+              aria-expanded={overflowOpen}
+              className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-white/10 bg-white/[0.02] text-neutral-300 md:hidden"
+            >
+              <svg viewBox="0 0 16 16" className="h-4 w-4" fill="currentColor">
+                <circle cx="3.5" cy="8" r="1.3" />
+                <circle cx="8" cy="8" r="1.3" />
+                <circle cx="12.5" cy="8" r="1.3" />
+              </svg>
+            </button>
           </div>
+
+          {/* Mobile overflow sheet */}
+          {overflowOpen ? (
+            <div
+              className="fixed inset-0 z-40 bg-black/60 md:hidden"
+              onClick={() => setOverflowOpen(false)}
+            >
+              <div
+                className="absolute inset-x-0 bottom-0 rounded-t-2xl border-t border-white/10 bg-[rgb(var(--surface-1))] p-4 pb-6"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-white/10" />
+                <div className="flex flex-col gap-2">
+                  <div onClick={() => setOverflowOpen(false)}>
+                    <GitHubPushButton projectId={project?.id ?? null} projectSlug={project?.slug ?? null} />
+                  </div>
+                  <div onClick={() => setOverflowOpen(false)}>
+                    <SupabaseButton projectId={project?.id ?? null} />
+                  </div>
+                  <div onClick={() => setOverflowOpen(false)}>
+                    <PublishButton projectId={project?.id ?? null} />
+                  </div>
+                  <button
+                    onClick={() => {
+                      setSecretsOpen(true);
+                      setOverflowOpen(false);
+                    }}
+                    className="flex h-12 items-center rounded-md border border-white/10 bg-white/[0.02] px-3 text-[14px] font-medium text-neutral-200"
+                  >
+                    {t('workspace.env')}
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : null}
 
           <SecretsDialog projectId={project?.id ?? null} open={secretsOpen} onOpenChange={setSecretsOpen} />
 
-          <div className="grid h-[calc(100%-4.5rem)] grid-cols-1 lg:grid-cols-[420px_1fr] gap-px bg-neutral-200 dark:bg-neutral-900">
-            <section className="min-h-0 bg-white dark:bg-neutral-950">
+          {/* ─── Desktop layout: chat | code|preview ─── */}
+          <div
+            className="hidden h-[calc(100%-4.5rem)] grid-cols-[420px_1fr] gap-px bg-white/5 lg:grid"
+          >
+            <section className="min-h-0 bg-[rgb(var(--surface-0))]">
               <ChatPanel turns={turns} onSend={send} sending={sending} disabled={!sandboxReady} />
             </section>
 
-            <section className="hidden min-h-0 flex-col lg:flex bg-white dark:bg-neutral-950">
-              {/* View switcher + contextual toolbar */}
-              <div className="flex h-10 shrink-0 items-center justify-between border-b border-neutral-200 bg-neutral-50/60 px-3 dark:border-neutral-900 dark:bg-neutral-950/60">
+            <section className="flex min-h-0 flex-col bg-[rgb(var(--surface-0))]">
+              <div className="flex h-10 shrink-0 items-center justify-between border-b border-white/5 bg-[rgb(var(--surface-0))]/60 px-3">
                 <Segmented
                   value={rightView}
                   onChange={setRightView}
@@ -145,7 +197,7 @@ export default function ProjectWorkspacePage() {
                   ) : (
                     <button
                       onClick={() => setTermOpen((v) => !v)}
-                      className="flex h-7 items-center gap-1.5 rounded-md border border-neutral-200 bg-white px-2 text-[12px] text-neutral-600 transition-colors hover:bg-neutral-100 dark:border-neutral-800 dark:bg-neutral-950 dark:text-neutral-400 dark:hover:bg-neutral-900"
+                      className="flex h-7 items-center gap-1.5 rounded-md border border-white/10 bg-white/[0.02] px-2 text-[12px] text-neutral-400 transition-colors hover:bg-white/[0.05]"
                       title={termOpen ? 'Hide terminal' : 'Show terminal'}
                     >
                       <svg viewBox="0 0 14 14" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="1.5">
@@ -154,7 +206,7 @@ export default function ProjectWorkspacePage() {
                       <span>Terminal</span>
                       <svg
                         viewBox="0 0 10 10"
-                        className={cn('h-2.5 w-2.5 text-neutral-400 transition-transform', termOpen && 'rotate-180')}
+                        className={cn('h-2.5 w-2.5 text-neutral-500 transition-transform', termOpen && 'rotate-180')}
                         fill="none"
                       >
                         <path d="M2 4l3 3 3-3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
@@ -164,16 +216,15 @@ export default function ProjectWorkspacePage() {
                 </div>
               </div>
 
-              {/* Body — swap between code view and preview view */}
               <div className="relative min-h-0 flex-1">
                 {rightView === 'code' ? (
                   <div
                     className={cn(
-                      'grid h-full gap-px bg-neutral-200 dark:bg-neutral-900',
+                      'grid h-full gap-px bg-white/5',
                       termOpen ? 'grid-rows-[1fr_240px]' : 'grid-rows-[1fr_0px]',
                     )}
                   >
-                    <div className="min-h-0 bg-white dark:bg-neutral-950">
+                    <div className="min-h-0 bg-[rgb(var(--surface-0))]">
                       <EditorPanel
                         projectId={project?.id ?? null}
                         sandboxReady={sandboxReady}
@@ -203,9 +254,91 @@ export default function ProjectWorkspacePage() {
             </section>
           </div>
 
-          {/* Status bar */}
+          {/* ─── Mobile layout: one panel + bottom tab bar ─── */}
+          <div className="relative h-[calc(100%-4.5rem-3.5rem)] lg:hidden">
+            {mobileView === 'chat' ? (
+              <section className="h-full bg-[rgb(var(--surface-0))]">
+                <ChatPanel turns={turns} onSend={send} sending={sending} disabled={!sandboxReady} />
+              </section>
+            ) : mobileView === 'code' ? (
+              <section className="h-full bg-[rgb(var(--surface-0))]">
+                <EditorPanel
+                  projectId={project?.id ?? null}
+                  sandboxReady={sandboxReady}
+                  refreshSignal={lastTurnAt}
+                />
+              </section>
+            ) : (
+              <section className="h-full bg-[rgb(var(--surface-0))]">
+                <PreviewPanel
+                  projectId={project?.id ?? null}
+                  previewUrl={previewUrl}
+                  viewport={viewport}
+                />
+              </section>
+            )}
+
+            {/* Floating terminal toggle (mobile only, Code/Preview views) */}
+            {mobileView !== 'chat' ? (
+              <button
+                onClick={() => setTermSheetOpen(true)}
+                className="absolute bottom-3 end-3 inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-[rgb(var(--surface-1))]/80 text-neutral-300 backdrop-blur-lg active:bg-white/[0.06]"
+                aria-label="Open terminal"
+              >
+                <svg viewBox="0 0 14 14" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.6">
+                  <path d="M2.5 4l2 2-2 2M6 9h5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+            ) : null}
+
+            {/* Mobile terminal sheet */}
+            {termSheetOpen ? (
+              <div
+                className="fixed inset-0 z-40 bg-black/70 lg:hidden"
+                onClick={() => setTermSheetOpen(false)}
+              >
+                <div
+                  className="absolute inset-x-0 bottom-0 h-[70vh] rounded-t-2xl border-t border-white/10 bg-[#0a0a0a]"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div className="mx-auto mb-2 mt-2.5 h-1 w-10 rounded-full bg-white/10" />
+                  <TerminalPanel
+                    projectId={project?.id ?? null}
+                    sandboxReady={sandboxReady}
+                    onClose={() => setTermSheetOpen(false)}
+                  />
+                </div>
+              </div>
+            ) : null}
+          </div>
+
+          {/* Mobile bottom tab bar */}
+          <div className="fixed inset-x-0 bottom-0 z-30 flex h-14 items-stretch border-t border-white/10 bg-[rgb(var(--surface-0))]/90 backdrop-blur-xl lg:hidden">
+            <MobileTab
+              icon={<ChatIcon />}
+              label="Chat"
+              active={mobileView === 'chat'}
+              onClick={() => setMobileView('chat')}
+              {...(turns.length > 0 ? { badge: turns.length } : {})}
+            />
+            <MobileTab
+              icon={<CodeIcon />}
+              label="Code"
+              active={mobileView === 'code'}
+              onClick={() => setMobileView('code')}
+            />
+            <MobileTab
+              icon={<PreviewIcon />}
+              label="Preview"
+              active={mobileView === 'preview'}
+              onClick={() => setMobileView('preview')}
+              {...(previewUrl ? { dot: 'emerald' as const } : {})}
+            />
+          </div>
+
+          {/* Status bar — desktop only */}
           <div
-            className="flex h-6 items-center justify-between border-t border-neutral-200 bg-neutral-50 px-3 font-mono text-[10.5px] text-neutral-500 dark:border-neutral-900 dark:bg-neutral-950 dark:text-neutral-500"
+            className="hidden h-6 items-center justify-between border-t border-white/5 bg-[rgb(var(--surface-0))] px-3 font-mono text-[10.5px] text-neutral-500 lg:flex"
             dir="ltr"
           >
             <div className="flex items-center gap-3">
@@ -219,11 +352,11 @@ export default function ProjectWorkspacePage() {
                 />
                 sandbox {sandboxReady ? 'ready' : 'starting'}
               </span>
-              <span className="text-neutral-300 dark:text-neutral-800">·</span>
+              <span className="text-neutral-700">·</span>
               <span>{project?.slug}</span>
               {previewUrl ? (
                 <>
-                  <span className="text-neutral-300 dark:text-neutral-800">·</span>
+                  <span className="text-neutral-700">·</span>
                   <span className="flex items-center gap-1.5">
                     <span className="h-1.5 w-1.5 rounded-full bg-sky-500" />
                     preview
@@ -233,15 +366,58 @@ export default function ProjectWorkspacePage() {
             </div>
             <div className="flex items-center gap-3">
               <span>{rightView}</span>
-              <span className="text-neutral-300 dark:text-neutral-800">·</span>
+              <span className="text-neutral-700">·</span>
               <span>{turns.length} turns</span>
-              <span className="text-neutral-300 dark:text-neutral-800">·</span>
+              <span className="text-neutral-700">·</span>
               <span>code.ae</span>
             </div>
           </div>
         </>
       )}
     </main>
+  );
+}
+
+function MobileTab({
+  icon,
+  label,
+  active,
+  onClick,
+  badge,
+  dot,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  active: boolean;
+  onClick: () => void;
+  badge?: number;
+  dot?: 'emerald';
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        'relative flex flex-1 flex-col items-center justify-center gap-0.5 text-[10.5px] font-medium transition-colors',
+        active ? 'text-white' : 'text-neutral-500 active:text-neutral-300',
+      )}
+      aria-pressed={active}
+    >
+      <span className={cn('relative flex items-center', active && 'text-brand-400')}>
+        {icon}
+        {dot === 'emerald' ? (
+          <span className="absolute -right-1 -top-0.5 h-1.5 w-1.5 rounded-full bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.8)]" />
+        ) : null}
+        {badge && badge > 0 ? (
+          <span className="absolute -right-2 -top-1 inline-flex min-w-[14px] items-center justify-center rounded-full bg-brand-400/20 px-1 text-[9px] font-semibold text-brand-300">
+            {badge > 99 ? '99+' : badge}
+          </span>
+        ) : null}
+      </span>
+      <span>{label}</span>
+      {active ? (
+        <span className="absolute inset-x-6 top-0 h-0.5 rounded-full bg-brand-400" />
+      ) : null}
+    </button>
   );
 }
 
@@ -255,7 +431,7 @@ function Segmented<T extends string>({
   options: { value: T; label: string; icon?: React.ReactNode }[];
 }) {
   return (
-    <div className="inline-flex rounded-md border border-neutral-200 bg-white p-0.5 dark:border-neutral-800 dark:bg-neutral-950">
+    <div className="inline-flex rounded-md border border-white/10 bg-white/[0.02] p-0.5">
       {options.map((opt) => (
         <button
           key={opt.value}
@@ -263,8 +439,8 @@ function Segmented<T extends string>({
           className={cn(
             'flex h-7 items-center gap-1.5 rounded px-2.5 text-[12px] font-medium transition-colors',
             value === opt.value
-              ? 'bg-neutral-900 text-white dark:bg-white dark:text-neutral-900'
-              : 'text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100',
+              ? 'bg-white text-neutral-900'
+              : 'text-neutral-400 hover:text-white',
           )}
         >
           {opt.icon}
@@ -288,7 +464,7 @@ function ViewportChips({
     { v: 'mobile', label: 'Mobile', w: '390' },
   ];
   return (
-    <div className="inline-flex rounded-md border border-neutral-200 bg-white p-0.5 dark:border-neutral-800 dark:bg-neutral-950">
+    <div className="inline-flex rounded-md border border-white/10 bg-white/[0.02] p-0.5">
       {chips.map((c) => (
         <button
           key={c.v}
@@ -296,9 +472,7 @@ function ViewportChips({
           title={`${c.label}${c.w !== 'full' ? ` · ${c.w}px` : ''}`}
           className={cn(
             'flex h-7 items-center justify-center gap-1.5 rounded px-2 transition-colors',
-            value === c.v
-              ? 'bg-neutral-900 text-white dark:bg-white dark:text-neutral-900'
-              : 'text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100',
+            value === c.v ? 'bg-white text-neutral-900' : 'text-neutral-400 hover:text-white',
           )}
         >
           {c.v === 'desktop' ? <DesktopIcon /> : c.v === 'tablet' ? <TabletIcon /> : <MobileIcon />}
@@ -308,18 +482,25 @@ function ViewportChips({
   );
 }
 
+function ChatIcon() {
+  return (
+    <svg viewBox="0 0 16 16" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.6">
+      <path d="M2.5 5a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2H7l-3 2.5V12H4.5a2 2 0 0 1-2-2V5z" strokeLinejoin="round" />
+    </svg>
+  );
+}
 function CodeIcon() {
   return (
-    <svg viewBox="0 0 14 14" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="1.5">
-      <path d="M5 4L2 7l3 3M9 4l3 3-3 3" strokeLinecap="round" strokeLinejoin="round" />
+    <svg viewBox="0 0 16 16" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.6">
+      <path d="M5.5 5 2.5 8l3 3M10.5 5l3 3-3 3" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }
 function PreviewIcon() {
   return (
-    <svg viewBox="0 0 14 14" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="1.5">
-      <rect x="2" y="3" width="10" height="8" rx="1" />
-      <path d="M2 6h10" />
+    <svg viewBox="0 0 16 16" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.6">
+      <rect x="2" y="3" width="12" height="10" rx="1.2" />
+      <path d="M2 6h12" />
     </svg>
   );
 }

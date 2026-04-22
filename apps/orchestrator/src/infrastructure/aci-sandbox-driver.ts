@@ -51,7 +51,7 @@ export class AciSandboxDriver implements SandboxDriver {
               { name: 'SANDBOX_TOKEN', secureValue: agentToken },
               { name: 'PORT', value: String(AGENT_PORT) },
               { name: 'WORKSPACE_ROOT', value: '/home/workspace/project' },
-              ...Object.entries(spec.env ?? {}).map(([name, value]) => ({ name, secureValue: value })),
+              ...Object.entries(spec.env ?? {}).map(([name, value]) => ({ name, secureValue: String(value) })),
             ],
           },
         ],

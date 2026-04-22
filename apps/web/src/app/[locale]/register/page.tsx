@@ -96,7 +96,7 @@ export default function RegisterPage() {
               />
             </div>
             <ErrorText>{error}</ErrorText>
-            <button type="submit" className="btn-primary w-full" disabled={loading}>
+            <button type="submit" className="btn-primary h-12 w-full text-[14px]" disabled={loading}>
               {loading ? <Spinner /> : t('auth.submitRegister')}
             </button>
           </form>

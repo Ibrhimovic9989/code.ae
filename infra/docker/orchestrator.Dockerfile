@@ -12,6 +12,8 @@ RUN pnpm install --frozen-lockfile --filter @code-ae/orchestrator... --filter @c
 FROM deps AS build
 COPY packages/shared packages/shared
 COPY apps/orchestrator apps/orchestrator
+# Shared must be compiled first so orchestrator's tsc can resolve `@code-ae/shared`.
+RUN pnpm --filter @code-ae/shared build
 RUN pnpm --filter @code-ae/orchestrator build
 
 FROM node:22-alpine AS runtime

@@ -68,19 +68,24 @@ export default function DashboardPage() {
         <div className="absolute inset-0 bg-dots opacity-50" />
       </div>
 
-      <header className="mb-10 flex items-end justify-between gap-4">
+      <header className="mb-8 flex flex-col gap-4 sm:mb-10 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <div className="font-mono text-[11px] uppercase tracking-[0.16em] text-brand-400">
+          <div className="font-mono text-[10.5px] uppercase tracking-[0.16em] text-brand-400 sm:text-[11px]">
             /dashboard
           </div>
-          <h1 className="mt-2 text-[34px] font-semibold leading-tight tracking-[-0.02em] text-white md:text-[40px]">
+          <h1 className="mt-2 text-[28px] font-semibold leading-tight tracking-[-0.02em] text-white sm:text-[34px] md:text-[40px]">
             {t('dashboard.title')}
           </h1>
-          <p className="mt-2 text-[14px] text-neutral-500">
+          <p className="mt-2 text-[13.5px] text-neutral-500 sm:text-[14px]">
             {projects?.length ?? 0} {projects?.length === 1 ? 'project' : 'projects'}
           </p>
         </div>
-        <Button variant="primary" size="lg" onClick={() => setShowCreate(true)}>
+        <Button
+          variant="primary"
+          size="lg"
+          onClick={() => setShowCreate(true)}
+          className="h-12 w-full sm:h-10 sm:w-auto"
+        >
           + {t('dashboard.newProject')}
         </Button>
       </header>
@@ -108,7 +113,7 @@ export default function DashboardPage() {
       {projects && projects.length === 0 ? (
         <EmptyState onCreate={() => setShowCreate(true)} label={t('dashboard.empty')} cta={t('dashboard.newProject')} />
       ) : (
-        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3">
           {projects?.map((p, i) => (
             <ProjectCard key={p.id} project={p} locale={locale} index={i} />
           ))}
@@ -246,11 +251,11 @@ function CreateProjectForm({ onDone }: { onDone: (p: Project | null) => void }) 
           <ErrorText>{error}</ErrorText>
         </div>
       ) : null}
-      <div className="flex flex-row-reverse gap-2 sm:col-span-2">
-        <button type="submit" disabled={loading} className="btn-primary">
+      <div className="flex flex-col-reverse gap-2 sm:col-span-2 sm:flex-row-reverse">
+        <button type="submit" disabled={loading} className="btn-primary h-12 sm:h-9">
           {loading ? <Spinner /> : t('dashboard.create')}
         </button>
-        <button type="button" onClick={() => onDone(null)} className="btn-ghost">
+        <button type="button" onClick={() => onDone(null)} className="btn-ghost h-12 sm:h-9">
           {t('dashboard.cancel')}
         </button>
       </div>

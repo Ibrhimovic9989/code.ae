@@ -42,15 +42,15 @@ export function ChatPanel({ turns, onSend, sending, disabled }: ChatPanelProps) 
   }
 
   return (
-    <div className="flex h-full flex-col bg-white dark:bg-neutral-950">
+    <div className="flex h-full flex-col bg-[rgb(var(--surface-0))]">
       <div className="flex-1 overflow-y-auto">
-        <div className="mx-auto max-w-3xl px-5 py-5">
+        <div className="mx-auto max-w-3xl px-4 py-4 sm:px-5 sm:py-5">
           {turns.length === 0 ? (
-            <p className="mt-12 text-center text-[13px] text-neutral-500">
+            <p className="mt-10 text-center text-[13px] text-neutral-500 sm:mt-12">
               {t('workspace.placeholder')}
             </p>
           ) : (
-            <div className="flex flex-col gap-6">
+            <div className="flex flex-col gap-5 sm:gap-6">
               {turns.map((turn, i) => (
                 <TurnView key={i} turn={turn} onAnswer={handleAnswer} sending={sending} />
               ))}
@@ -62,7 +62,7 @@ export function ChatPanel({ turns, onSend, sending, disabled }: ChatPanelProps) 
 
       <form
         onSubmit={onSubmit}
-        className="border-t border-neutral-200 bg-white p-3 dark:border-neutral-900 dark:bg-neutral-950"
+        className="border-t border-white/5 bg-[rgb(var(--surface-0))] p-2.5 sm:p-3"
       >
         <div className="mx-auto flex max-w-3xl gap-2">
           <textarea
@@ -77,9 +77,15 @@ export function ChatPanel({ turns, onSend, sending, disabled }: ChatPanelProps) 
                 void onSubmit(e as unknown as FormEvent);
               }
             }}
-            className="flex-1 resize-none rounded-md border border-neutral-200 bg-white px-3 py-2 text-[13px] leading-relaxed text-neutral-900 placeholder:text-neutral-400 focus:border-neutral-400 focus:outline-none disabled:opacity-50 dark:border-neutral-800 dark:bg-neutral-950 dark:text-neutral-100 dark:placeholder:text-neutral-600 dark:focus:border-neutral-600"
+            className="flex-1 resize-none rounded-md border border-white/10 bg-white/[0.02] px-3 py-2.5 text-[14px] leading-relaxed text-neutral-100 placeholder:text-neutral-500 focus:border-white/30 focus:bg-white/[0.04] focus:outline-none disabled:opacity-50"
           />
-          <Button type="submit" variant="primary" disabled={disabled || sending || !value.trim()}>
+          <Button
+            type="submit"
+            variant="primary"
+            size="lg"
+            className="shrink-0 self-stretch"
+            disabled={disabled || sending || !value.trim()}
+          >
             {sending ? <Spinner /> : t('workspace.send')}
           </Button>
         </div>
