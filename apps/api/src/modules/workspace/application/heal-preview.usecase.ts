@@ -37,8 +37,15 @@ export class HealPreviewUseCase {
     const endpoint = await this.resolve.execute(projectId, ownerId);
 
     const script = this.buildRecipe();
+    // IMPORTANT: do NOT wrap this in `bash -lc ${JSON.stringify(script)}`.
+    // The sandbox-agent already calls `spawn('bash', ['-lc', command])` on
+    // whatever we send as `command`. Double-wrapping caused the inner bash
+    // to receive the script as a single double-quoted string with literal
+    // \n between statements, which made the whole recipe collapse to one
+    // line and fail with "syntax error: unexpected end of file" — no
+    // CAE_RESULT marker ever got echoed, hence the `verdict=''` logs.
     const res = await this.agent.exec(endpoint, {
-      command: `bash -lc ${JSON.stringify(script)}`,
+      command: script,
       cwd: '.',
       timeoutMs: 220_000,
     });

@@ -62,8 +62,10 @@ tail -120 /tmp/dev.log 2>/dev/null
 echo "CAE_LOG_END"
 `;
 
+    // Send script raw — the sandbox-agent already wraps it in `bash -lc`.
+    // (Double-wrapping broke the heal recipe; same bug class here.)
     const res = await this.agent.exec(endpoint, {
-      command: `bash -lc ${JSON.stringify(script)}`,
+      command: script,
       cwd: '.',
       timeoutMs: 15_000,
     });
