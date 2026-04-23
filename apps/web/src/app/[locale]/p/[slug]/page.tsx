@@ -286,6 +286,7 @@ export default function ProjectWorkspacePage() {
                     projectId={project?.id ?? null}
                     previewUrl={previewUrl}
                     viewport={viewport}
+                    githubLinked={Boolean(project?.githubRepoUrl)}
                   />
                 )}
               </div>

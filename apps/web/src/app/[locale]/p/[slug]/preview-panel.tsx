@@ -13,6 +13,8 @@ interface Props {
   projectId: string | null;
   previewUrl: string | null;
   viewport?: ViewportSize;
+  /** Whether the project is linked to GitHub (makes restart non-destructive). */
+  githubLinked?: boolean;
 }
 
 const VIEWPORT_WIDTHS: Record<ViewportSize, string> = {
@@ -40,7 +42,12 @@ function useProxiedPreviewUrl(projectId: string | null, previewUrl: string | nul
   return `${apiBase}/preview/${projectId}/?t=${encodeURIComponent(token)}`;
 }
 
-export function PreviewPanel({ projectId, previewUrl, viewport = 'desktop' }: Props) {
+export function PreviewPanel({
+  projectId,
+  previewUrl,
+  viewport = 'desktop',
+  githubLinked = false,
+}: Props) {
   const [manualNonce, setManualNonce] = useState(0);
   const [restarting, setRestarting] = useState(false);
   // After a restart, the new container takes ~45–75s before the dev server
@@ -92,31 +99,55 @@ export function PreviewPanel({ projectId, previewUrl, viewport = 'desktop' }: Pr
 
   async function restartSandbox() {
     if (!projectId || restarting) return;
-    if (!window.confirm('Restart the sandbox? The current dev server will be stopped and a fresh container will start. This takes ~30–60 seconds.')) {
-      return;
-    }
+
+    // Restart destroys the sandbox container. If the project isn't linked to
+    // GitHub, every unpushed file in the workspace is lost for good —
+    // the sandbox has no persistent volume. Scream about this before the
+    // user clicks through.
+    const confirmMsg = githubLinked
+      ? 'Restart the sandbox?\n\nWe\'ll stop the current container and spin up a fresh one, then auto-restore your files from GitHub (latest pushed state). Takes ~60–90 seconds. Any files not pushed to GitHub will be lost.'
+      : '⚠ DATA LOSS WARNING\n\nThis project is NOT connected to GitHub. Restarting the sandbox will permanently delete ALL files in your workspace — there is no persistent storage.\n\nConnect GitHub and push first if you want to keep your work.\n\nProceed anyway?';
+    if (!window.confirm(confirmMsg)) return;
+
     setRestarting(true);
-    // Cover the entire window — from stopSandbox request through the 60-90s
-    // bootstrap — with the "Starting" overlay. Setting this BEFORE the stop
-    // call means users never see the 404/502 transients that happen between
-    // stop and start, and while bun run dev is still compiling.
-    setStartingUntil(Date.now() + 90_000);
+    setStartingUntil(Date.now() + 120_000);
     const toastId = 'sandbox-restart';
     toast.loading('Stopping sandbox…', { id: toastId });
     try {
       try {
         await api.stopSandbox(projectId);
-      } catch {
+      } catch (err) {
         // stop can fail if the sandbox is already gone — proceed to start anyway.
+        console.warn('[restart] stopSandbox failed (continuing):', err);
       }
       toast.loading('Starting fresh sandbox…', { id: toastId });
-      await api.startSandbox(projectId);
-      toast.success('Sandbox restarted. Waiting for the dev server to come up…', {
-        id: toastId,
-        duration: 6000,
-      });
-      // Force-remount the iframe; page.tsx polls getSandbox every 5s and will
-      // pick up the new preview URL as soon as the sandbox is ready.
+      const started = await api.startSandbox(projectId);
+      console.info('[restart] new sandbox:', started);
+
+      if (githubLinked) {
+        // Fresh sandbox = empty workspace. Pull the latest pushed state from
+        // GitHub so restart isn't destructive. Needs the sandbox agent to be
+        // reachable, so we retry until it is (or give up after ~60s).
+        toast.loading('Restoring files from GitHub…', { id: toastId });
+        const restored = await restoreWithRetry(projectId);
+        if (restored.restored) {
+          toast.success(
+            `Restored ${restored.filesRestored ?? 0} files. Starting dev server…`,
+            { id: toastId, duration: 5000 },
+          );
+        } else {
+          toast.error(
+            `Restore failed (${restored.reason ?? 'unknown'}). Sandbox is empty.`,
+            { id: toastId, duration: 8000 },
+          );
+        }
+      } else {
+        toast.success('Sandbox restarted. Waiting for the dev server to come up…', {
+          id: toastId,
+          duration: 6000,
+        });
+      }
+
       setManualNonce((n) => n + 1);
     } catch (err) {
       toast.error(
@@ -272,6 +303,38 @@ function IconButton({ children, ...props }: React.ButtonHTMLAttributes<HTMLButto
       {children}
     </button>
   );
+}
+
+/**
+ * After a fresh sandbox is created the agent container takes 10-30s to finish
+ * booting. `restoreFromGitHub` depends on the agent being reachable, so retry
+ * the call until it either succeeds or the overall attempt window elapses.
+ */
+async function restoreWithRetry(
+  projectId: string,
+): Promise<{ restored: boolean; reason?: string; filesRestored?: number }> {
+  const deadline = Date.now() + 60_000;
+  let lastErr: unknown = null;
+  while (Date.now() < deadline) {
+    try {
+      const res = await api.restoreFromGitHub(projectId);
+      console.info('[restart] restoreFromGitHub:', res);
+      // `sandbox-unreachable` means the agent isn't up yet — keep retrying.
+      if (res.reason === 'sandbox-unreachable') {
+        await new Promise((r) => setTimeout(r, 3000));
+        continue;
+      }
+      return res;
+    } catch (err) {
+      lastErr = err;
+      console.warn('[restart] restore attempt threw:', err);
+      await new Promise((r) => setTimeout(r, 3000));
+    }
+  }
+  return {
+    restored: false,
+    reason: lastErr instanceof Error ? lastErr.message : 'timeout',
+  };
 }
 
 function StartingContainer() {
