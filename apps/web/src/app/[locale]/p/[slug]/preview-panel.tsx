@@ -43,6 +43,11 @@ function useProxiedPreviewUrl(projectId: string | null, previewUrl: string | nul
 export function PreviewPanel({ projectId, previewUrl, viewport = 'desktop' }: Props) {
   const [manualNonce, setManualNonce] = useState(0);
   const [restarting, setRestarting] = useState(false);
+  // After a restart, the new container takes ~45–75s before the dev server
+  // comes up. During that grace window we hide the iframe and show a "Starting
+  // container" state instead of letting the user see the proxy's
+  // fetch-failed / 502 body.
+  const [startingUntil, setStartingUntil] = useState<number>(0);
   const iframeSrc = useProxiedPreviewUrl(projectId, previewUrl);
 
   // Silent watchdog: probes the preview health via the backend heal endpoint,
@@ -70,6 +75,21 @@ export function PreviewPanel({ projectId, previewUrl, viewport = 'desktop' }: Pr
     setManualNonce((n) => n + 1);
   }
 
+  // Clear the starting-grace window once it elapses so the iframe reappears
+  // without requiring another interaction.
+  useEffect(() => {
+    if (startingUntil === 0) return;
+    const left = startingUntil - Date.now();
+    if (left <= 0) {
+      setStartingUntil(0);
+      return;
+    }
+    const t = setTimeout(() => setStartingUntil(0), left);
+    return () => clearTimeout(t);
+  }, [startingUntil]);
+
+  const isStarting = restarting || (startingUntil > 0 && Date.now() < startingUntil);
+
   async function restartSandbox() {
     if (!projectId || restarting) return;
     if (!window.confirm('Restart the sandbox? The current dev server will be stopped and a fresh container will start. This takes ~30–60 seconds.')) {
@@ -90,6 +110,9 @@ export function PreviewPanel({ projectId, previewUrl, viewport = 'desktop' }: Pr
         id: toastId,
         duration: 6000,
       });
+      // Hide the iframe for ~75s while the new container boots + bun run dev
+      // compiles. The heal watchdog kicks in at ~30s to warm the dev server.
+      setStartingUntil(Date.now() + 75_000);
       // Force-remount the iframe; page.tsx polls getSandbox every 5s and will
       // pick up the new preview URL as soon as the sandbox is ready.
       setManualNonce((n) => n + 1);
@@ -190,7 +213,9 @@ export function PreviewPanel({ projectId, previewUrl, viewport = 'desktop' }: Pr
             : 'bg-white dark:bg-black',
         )}
       >
-        {previewUrl ? (
+        {isStarting ? (
+          <StartingContainer />
+        ) : previewUrl ? (
           <div
             className={cn(
               'h-full',
@@ -241,6 +266,28 @@ function IconButton({ children, ...props }: React.ButtonHTMLAttributes<HTMLButto
     >
       {children}
     </button>
+  );
+}
+
+function StartingContainer() {
+  return (
+    <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-neutral-100 p-8 dark:bg-neutral-950">
+      <div
+        aria-hidden
+        className="absolute inset-0 opacity-[0.4] [background-image:linear-gradient(rgba(128,128,128,0.08)_1px,transparent_1px),linear-gradient(90deg,rgba(128,128,128,0.08)_1px,transparent_1px)] [background-size:24px_24px]"
+      />
+      <div className="relative flex flex-col items-center gap-3">
+        <Spinner className="h-5 w-5 text-neutral-400" />
+        <div className="text-center">
+          <div className="text-[13px] font-medium text-neutral-600 dark:text-neutral-400">
+            Starting a fresh container
+          </div>
+          <div className="mt-1 text-[11.5px] text-neutral-400 dark:text-neutral-600">
+            This takes 45–75 seconds. The dev server will be online shortly.
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 

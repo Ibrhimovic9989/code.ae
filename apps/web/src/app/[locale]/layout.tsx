@@ -46,7 +46,10 @@ export default async function LocaleLayout({
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeBootstrapScript }} />
       </head>
-      <body className="relative min-h-screen bg-[rgb(var(--surface-0))] text-neutral-100 antialiased">
+      <body
+        className="relative min-h-screen bg-[rgb(var(--surface-0))] text-neutral-100 antialiased"
+        suppressHydrationWarning
+      >
         {/* Decorative global backdrop — matches landing */}
         <div aria-hidden className="pointer-events-none fixed inset-x-0 top-0 -z-10 h-[60vh] bg-dots mask-fade-bottom opacity-40" />
         <NextIntlClientProvider messages={messages}>
