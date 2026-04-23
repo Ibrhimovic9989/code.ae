@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { api } from '../../../../lib/api-client';
+import { api, ApiError } from '../../../../lib/api-client';
 
 export type WatchdogState = 'idle' | 'probing' | 'healing' | 'healthy' | 'degraded' | 'stuck';
 
@@ -111,9 +111,17 @@ export function usePreviewWatchdog({
         } else {
           await healNow();
         }
-      } catch {
-        // Backend probe failure is itself a signal something is wrong.
-        if (!cancelled) await healNow();
+      } catch (err) {
+        // Auth failures (401/403 from a stale cookie, refresh race) tell us
+        // nothing about the preview itself — don't escalate to a destructive
+        // heal on them. Every other probe failure (network, 5xx from the
+        // sandbox, timeout) IS a signal to heal.
+        const status = err instanceof ApiError ? err.status : 0;
+        if (status === 401 || status === 403) {
+          setState('idle');
+        } else if (!cancelled) {
+          await healNow();
+        }
       }
       if (cancelled) return;
       probeTimer = setTimeout(probe, probeIntervalMs);

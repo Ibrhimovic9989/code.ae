@@ -44,21 +44,34 @@ export class HealPreviewUseCase {
     });
 
     const out = (res.stdout ?? '') + (res.stderr ? `\n[stderr]\n${res.stderr}` : '');
-    const healed = /CAE_RESULT=healed/.test(out);
+    // Match the LAST CAE_RESULT marker in the output — the recipe may emit
+    // several if it's diagnostic (e.g. writing CAE_RESULT at top AND end) and
+    // we want the final verdict. Use a global match, take the last.
+    const markers = Array.from(out.matchAll(/CAE_RESULT=([a-z0-9_-]+)/gi)).map(
+      (m) => m[1]?.toLowerCase() ?? '',
+    );
+    const verdict = markers[markers.length - 1] ?? '';
+    const healed = verdict === 'healed';
     const reason = healed
       ? undefined
-      : /CAE_RESULT=port-stuck/.test(out)
+      : verdict === 'port-stuck'
         ? 'port-3000-permanently-occupied'
-        : /CAE_RESULT=install-failed/.test(out)
+        : verdict === 'install-failed'
           ? 'install-failed'
-          : /CAE_RESULT=timeout/.test(out)
+          : verdict === 'timeout'
             ? 'compile-timeout'
-            : 'unknown';
+            : verdict === 'no-workspace'
+              ? 'workspace-missing'
+              : verdict === 'no-package-json'
+                ? 'no-package-json'
+                : 'unknown';
 
     const detail = this.extractTail(out, 80);
 
     if (!healed) {
-      this.logger.warn(`Heal failed for project ${projectId}: ${reason}`);
+      this.logger.warn(
+        `Heal failed for project ${projectId}: ${reason} (verdict='${verdict}', stdoutLen=${(res.stdout ?? '').length}, stderrLen=${(res.stderr ?? '').length})`,
+      );
     }
 
     return {
@@ -72,14 +85,17 @@ export class HealPreviewUseCase {
   private buildRecipe(): string {
     // Single bash script. /proc-based port detection works in any Linux container
     // (no lsof/ss/fuser dependency). Port 3000 = hex 0BB8; TCP state 0A = LISTEN.
+    // Everything that's not a CAE_RESULT marker is silenced with &>/dev/null
+    // so the recipe can't produce more than ~a few KB of stdout even when
+    // bun install prints 50 MB of progress bars. That keeps the marker inside
+    // the sandbox-agent's 1 MB stdout ring buffer no matter how noisy the
+    // install/compile phase gets — the earlier "verdict=unknown" came from
+    // the marker being sliced off the front.
     return `set +e
 cd /home/workspace/project 2>/dev/null || { echo "CAE_RESULT=no-workspace"; exit 0; }
 [ -f package.json ] || { echo "CAE_RESULT=no-package-json"; exit 0; }
 
 # Fast path: if the preview is already serving a clean 200, don't touch it.
-# This keeps the watchdog from destructively "healing" a healthy sandbox,
-# which itself was causing the port-3000-permanently-occupied toast (kill
-# stomps on the live dev server, port lingers, next probe declares stuck).
 STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 3 http://localhost:3000 2>/dev/null)
 if [ "$STATUS" = "200" ]; then
   BODY=$(curl -s --max-time 3 http://localhost:3000 2>/dev/null)
@@ -89,9 +105,9 @@ if [ "$STATUS" = "200" ]; then
   fi
 fi
 
-# Install deps if node_modules missing
+# Install deps if node_modules missing (silence chatty output)
 if [ ! -d node_modules ]; then
-  bun install --no-summary 2>&1 | tail -5 || { echo "CAE_RESULT=install-failed"; exit 0; }
+  bun install --no-summary >/dev/null 2>&1 || { echo "CAE_RESULT=install-failed"; exit 0; }
 fi
 
 # Kill anything holding port 3000, then anything with next/bun/node in its cmdline
@@ -150,8 +166,8 @@ if [ -n "$HEALED" ]; then
 else
   echo "CAE_RESULT=timeout"
 fi
-echo "--- dev.log tail ---"
-tail -40 /tmp/dev.log
+# dev.log tail intentionally omitted — keep stdout small so the verdict
+# marker survives the agent's ring buffer even under extreme compile noise.
 `;
   }
 
