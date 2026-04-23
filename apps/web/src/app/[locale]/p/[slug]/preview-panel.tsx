@@ -42,6 +42,7 @@ function useProxiedPreviewUrl(projectId: string | null, previewUrl: string | nul
 
 export function PreviewPanel({ projectId, previewUrl, viewport = 'desktop' }: Props) {
   const [manualNonce, setManualNonce] = useState(0);
+  const [restarting, setRestarting] = useState(false);
   const iframeSrc = useProxiedPreviewUrl(projectId, previewUrl);
 
   // Silent watchdog: probes the preview health via the backend heal endpoint,
@@ -67,6 +68,39 @@ export function PreviewPanel({ projectId, previewUrl, viewport = 'desktop' }: Pr
   async function manualHeal() {
     await healNow();
     setManualNonce((n) => n + 1);
+  }
+
+  async function restartSandbox() {
+    if (!projectId || restarting) return;
+    if (!window.confirm('Restart the sandbox? The current dev server will be stopped and a fresh container will start. This takes ~30–60 seconds.')) {
+      return;
+    }
+    setRestarting(true);
+    const toastId = 'sandbox-restart';
+    toast.loading('Stopping sandbox…', { id: toastId });
+    try {
+      try {
+        await api.stopSandbox(projectId);
+      } catch {
+        // stop can fail if the sandbox is already gone — proceed to start anyway.
+      }
+      toast.loading('Starting fresh sandbox…', { id: toastId });
+      await api.startSandbox(projectId);
+      toast.success('Sandbox restarted. Waiting for the dev server to come up…', {
+        id: toastId,
+        duration: 6000,
+      });
+      // Force-remount the iframe; page.tsx polls getSandbox every 5s and will
+      // pick up the new preview URL as soon as the sandbox is ready.
+      setManualNonce((n) => n + 1);
+    } catch (err) {
+      toast.error(
+        `Restart failed: ${err instanceof Error ? err.message : String(err)}`,
+        { id: toastId, duration: 8000 },
+      );
+    } finally {
+      setRestarting(false);
+    }
   }
 
   const displayUrl = previewUrl ? stripProtocol(previewUrl) : 'localhost:3000';
@@ -108,7 +142,7 @@ export function PreviewPanel({ projectId, previewUrl, viewport = 'desktop' }: Pr
           <IconButton
             title={watchdogState === 'healing' ? 'Healing…' : 'Force heal'}
             onClick={manualHeal}
-            disabled={!projectId || watchdogState === 'healing'}
+            disabled={!projectId || watchdogState === 'healing' || restarting}
           >
             {watchdogState === 'healing' ? (
               <Spinner className="h-3 w-3" />
@@ -116,6 +150,24 @@ export function PreviewPanel({ projectId, previewUrl, viewport = 'desktop' }: Pr
               <svg viewBox="0 0 14 14" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.5">
                 <path d="M11.5 3v2.5H9" strokeLinecap="round" strokeLinejoin="round" />
                 <path d="M11 6a4 4 0 1 0-.5 3" strokeLinecap="round" />
+              </svg>
+            )}
+          </IconButton>
+          <IconButton
+            title={restarting ? 'Restarting sandbox…' : 'Restart sandbox (stop + fresh container)'}
+            onClick={restartSandbox}
+            disabled={!projectId || restarting}
+          >
+            {restarting ? (
+              <Spinner className="h-3 w-3" />
+            ) : (
+              <svg viewBox="0 0 14 14" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <path
+                  d="M11 3.5V6H8.5M11 6A4.5 4.5 0 1 0 10.2 9"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+                <rect x="4" y="5" width="5" height="4" rx="0.5" fill="currentColor" />
               </svg>
             )}
           </IconButton>
