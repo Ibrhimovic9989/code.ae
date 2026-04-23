@@ -283,6 +283,7 @@ class ApiClient {
     content: string,
     locale?: 'ar' | 'en',
     toolResponses?: Array<{ id: string; content: unknown }>,
+    mode?: 'plan' | 'build',
   ): Promise<Response> {
     return fetch(`${API_URL}/sessions/${sessionId}/messages`, {
       method: 'POST',
@@ -294,6 +295,7 @@ class ApiClient {
       body: JSON.stringify({
         content,
         ...(locale ? { locale } : {}),
+        ...(mode ? { mode } : {}),
         ...(toolResponses && toolResponses.length > 0 ? { toolResponses } : {}),
       }),
     });

@@ -39,6 +39,7 @@ export class SessionsController {
       | {
           content?: string;
           locale?: 'ar' | 'en';
+          mode?: 'plan' | 'build';
           toolResponses?: Array<{ id: string; content: unknown }>;
         }
       | undefined,
@@ -52,6 +53,7 @@ export class SessionsController {
       : body?.locale === 'ar' ? 'ar'
       : user.locale === 'en' ? 'en'
       : 'ar';
+    const mode: 'plan' | 'build' = body?.mode === 'plan' ? 'plan' : 'build';
 
     applySseHeaders(req, reply);
 
@@ -62,6 +64,7 @@ export class SessionsController {
         content,
         locale,
         toolResponses,
+        mode,
       )) {
         reply.raw.write(`event: ${ev.type}\n`);
         reply.raw.write(`data: ${JSON.stringify(ev)}\n\n`);

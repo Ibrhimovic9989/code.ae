@@ -62,6 +62,7 @@ export class SendMessageUseCase {
     userContent: string,
     userLocale: 'ar' | 'en' = 'ar',
     toolResponses: ToolResponseInput[] = [],
+    mode: 'plan' | 'build' = 'build',
   ): AsyncGenerator<SessionStreamEvent> {
     if (!userContent.trim() && toolResponses.length === 0) {
       throw new ValidationError('Either message content or tool responses required');
@@ -131,6 +132,7 @@ export class SendMessageUseCase {
       hasBackend: true,
       hasFrontend: true,
       supabaseLinked: Boolean(projectObj.supabaseProjectRef),
+      mode,
     });
 
     // If the project has Supabase linked and the user has a PAT on file, make
@@ -154,7 +156,15 @@ export class SendMessageUseCase {
       assistantTextBuffer = '';
       pendingToolCalls = [];
 
-      const tools = buildAgentTools(this.mcp.listTools({ projectId: project.id }));
+      const allTools = buildAgentTools(this.mcp.listTools({ projectId: project.id }));
+      // In plan mode, restrict the tool surface to read-only operations so
+      // the agent literally cannot edit files or run commands — it has to
+      // write a plan. Allow-list rather than deny-list: every new mutating
+      // tool is opt-out by default.
+      const tools =
+        mode === 'plan'
+          ? allTools.filter((tool) => isPlanModeAllowed(tool.name))
+          : allTools;
       const stream = runner.run({ systemPrompt, messages: agentMessages, tools });
 
       for await (const ev of stream) {
@@ -286,4 +296,22 @@ export class SendMessageUseCase {
       content: obj.content,
     };
   }
+}
+
+/**
+ * Plan mode allow-list. Read-only tools only — the agent is expected to write
+ * a plan in prose, not mutate anything. New mutating tools are opt-out by
+ * default; to let one run in plan mode, add its name here.
+ */
+function isPlanModeAllowed(toolName: string): boolean {
+  if (toolName === 'read_file' || toolName === 'list_files' || toolName === 'ask_user') {
+    return true;
+  }
+  // MCP supabase introspection is safe (list_tables, list_extensions, etc.);
+  // execute_sql and apply_migration are mutating — block them.
+  if (toolName.startsWith('mcp__supabase__')) {
+    const leaf = toolName.slice('mcp__supabase__'.length);
+    return leaf.startsWith('list_') || leaf.startsWith('get_') || leaf === 'generate_typescript_types';
+  }
+  return false;
 }

@@ -40,6 +40,8 @@ export interface ChatTurn {
 export interface SendInput {
   content?: string;
   toolResponses?: Array<{ id: string; content: unknown }>;
+  /** Plan mode: read-only exploration + written plan, no edits/commands. */
+  mode?: 'plan' | 'build';
   /** Client-side metadata — never serialized to the API. */
   meta?: { autoFix?: string };
 }
@@ -98,6 +100,7 @@ export function useSessionStream(
       const normalized: SendInput = typeof input === 'string' ? { content: input } : input;
       const content = normalized.content ?? '';
       const toolResponses = normalized.toolResponses ?? [];
+      const mode: 'plan' | 'build' = normalized.mode === 'plan' ? 'plan' : 'build';
       if (!content.trim() && toolResponses.length === 0) return;
 
       setSending(true);
@@ -143,7 +146,7 @@ export function useSessionStream(
       });
 
       try {
-        const res = await api.streamMessage(session.id, content, locale, toolResponses);
+        const res = await api.streamMessage(session.id, content, locale, toolResponses, mode);
         if (!res.ok && res.status !== 200) {
           const text = await res.text();
           throw new Error(`HTTP ${res.status}: ${text}`);

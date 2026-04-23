@@ -19,6 +19,7 @@ interface ChatPanelProps {
 export function ChatPanel({ turns, onSend, sending, disabled }: ChatPanelProps) {
   const t = useTranslations();
   const [value, setValue] = useState('');
+  const [mode, setMode] = useState<'plan' | 'build'>('build');
   const endRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -28,7 +29,7 @@ export function ChatPanel({ turns, onSend, sending, disabled }: ChatPanelProps) 
   function onSubmit(e: FormEvent) {
     e.preventDefault();
     if (!value.trim() || sending) return;
-    onSend(value);
+    onSend({ content: value, mode });
     setValue('');
   }
 
@@ -64,33 +65,107 @@ export function ChatPanel({ turns, onSend, sending, disabled }: ChatPanelProps) 
         onSubmit={onSubmit}
         className="border-t border-white/5 bg-[rgb(var(--surface-0))] p-2.5 sm:p-3"
       >
-        <div className="mx-auto flex max-w-3xl gap-2">
-          <textarea
-            value={value}
-            onChange={(e) => setValue(e.target.value)}
-            placeholder={t('workspace.placeholder')}
-            disabled={disabled || sending}
-            rows={2}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                void onSubmit(e as unknown as FormEvent);
+        <div className="mx-auto flex max-w-3xl flex-col gap-2">
+          <div className="flex items-center justify-between">
+            <ModeToggle value={mode} onChange={setMode} disabled={sending} />
+            {mode === 'plan' ? (
+              <span className="text-[11px] text-neutral-500">
+                Plan mode — agent writes a plan, doesn&apos;t edit files.
+              </span>
+            ) : null}
+          </div>
+          <div className="flex gap-2">
+            <textarea
+              value={value}
+              onChange={(e) => setValue(e.target.value)}
+              placeholder={
+                mode === 'plan' ? 'Describe what you want planned…' : t('workspace.placeholder')
               }
-            }}
-            className="flex-1 resize-none rounded-md border border-white/10 bg-white/[0.02] px-3 py-2.5 text-[14px] leading-relaxed text-neutral-100 placeholder:text-neutral-500 focus:border-white/30 focus:bg-white/[0.04] focus:outline-none disabled:opacity-50"
-          />
-          <Button
-            type="submit"
-            variant="primary"
-            size="lg"
-            className="shrink-0 self-stretch"
-            disabled={disabled || sending || !value.trim()}
-          >
-            {sending ? <Spinner /> : t('workspace.send')}
-          </Button>
+              disabled={disabled || sending}
+              rows={2}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  void onSubmit(e as unknown as FormEvent);
+                }
+              }}
+              className="flex-1 resize-none rounded-md border border-white/10 bg-white/[0.02] px-3 py-2.5 text-[14px] leading-relaxed text-neutral-100 placeholder:text-neutral-500 focus:border-white/30 focus:bg-white/[0.04] focus:outline-none disabled:opacity-50"
+            />
+            <Button
+              type="submit"
+              variant="primary"
+              size="lg"
+              className="shrink-0 self-stretch"
+              disabled={disabled || sending || !value.trim()}
+            >
+              {sending ? <Spinner /> : mode === 'plan' ? 'Plan' : t('workspace.send')}
+            </Button>
+          </div>
         </div>
       </form>
     </div>
+  );
+}
+
+function ModeToggle({
+  value,
+  onChange,
+  disabled,
+}: {
+  value: 'plan' | 'build';
+  onChange: (v: 'plan' | 'build') => void;
+  disabled?: boolean;
+}) {
+  return (
+    <div
+      className={cn(
+        'inline-flex rounded-md border border-white/10 bg-white/[0.02] p-0.5 text-[11.5px] font-medium',
+        disabled && 'opacity-50',
+      )}
+      role="tablist"
+      aria-label="Chat mode"
+    >
+      {(['build', 'plan'] as const).map((m) => (
+        <button
+          key={m}
+          type="button"
+          role="tab"
+          aria-selected={value === m}
+          disabled={disabled}
+          onClick={() => onChange(m)}
+          className={cn(
+            'flex h-6 items-center gap-1.5 rounded px-2 transition-colors',
+            value === m
+              ? 'bg-white text-neutral-900'
+              : 'text-neutral-400 hover:text-white',
+          )}
+          title={
+            m === 'plan'
+              ? 'Plan mode — read-only exploration + a written plan'
+              : 'Build mode — agent edits files and runs commands'
+          }
+        >
+          {m === 'plan' ? <PlanIcon /> : <BuildIcon />}
+          <span>{m === 'plan' ? 'Plan' : 'Build'}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function BuildIcon() {
+  return (
+    <svg viewBox="0 0 14 14" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="1.6">
+      <path d="M2 11l4.5-4.5M8 6l3-3 1 1-3 3M6.5 6.5l1 1" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+function PlanIcon() {
+  return (
+    <svg viewBox="0 0 14 14" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="1.6">
+      <rect x="3" y="2" width="8" height="10" rx="1" />
+      <path d="M5 5h4M5 7h4M5 9h2" strokeLinecap="round" />
+    </svg>
   );
 }
 
