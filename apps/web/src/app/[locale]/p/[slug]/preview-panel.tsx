@@ -96,6 +96,11 @@ export function PreviewPanel({ projectId, previewUrl, viewport = 'desktop' }: Pr
       return;
     }
     setRestarting(true);
+    // Cover the entire window — from stopSandbox request through the 60-90s
+    // bootstrap — with the "Starting" overlay. Setting this BEFORE the stop
+    // call means users never see the 404/502 transients that happen between
+    // stop and start, and while bun run dev is still compiling.
+    setStartingUntil(Date.now() + 90_000);
     const toastId = 'sandbox-restart';
     toast.loading('Stopping sandbox…', { id: toastId });
     try {
@@ -110,9 +115,6 @@ export function PreviewPanel({ projectId, previewUrl, viewport = 'desktop' }: Pr
         id: toastId,
         duration: 6000,
       });
-      // Hide the iframe for ~75s while the new container boots + bun run dev
-      // compiles. The heal watchdog kicks in at ~30s to warm the dev server.
-      setStartingUntil(Date.now() + 75_000);
       // Force-remount the iframe; page.tsx polls getSandbox every 5s and will
       // pick up the new preview URL as soon as the sandbox is ready.
       setManualNonce((n) => n + 1);
@@ -121,6 +123,9 @@ export function PreviewPanel({ projectId, previewUrl, viewport = 'desktop' }: Pr
         `Restart failed: ${err instanceof Error ? err.message : String(err)}`,
         { id: toastId, duration: 8000 },
       );
+      // Restart failed — drop the overlay so the user can see what's actually
+      // on the iframe side.
+      setStartingUntil(0);
     } finally {
       setRestarting(false);
     }

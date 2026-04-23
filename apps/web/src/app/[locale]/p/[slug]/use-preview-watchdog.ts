@@ -112,12 +112,13 @@ export function usePreviewWatchdog({
           await healNow();
         }
       } catch (err) {
-        // Auth failures (401/403 from a stale cookie, refresh race) tell us
-        // nothing about the preview itself — don't escalate to a destructive
-        // heal on them. Every other probe failure (network, 5xx from the
-        // sandbox, timeout) IS a signal to heal.
+        // Auth failures (401/403 from a stale cookie, refresh race) and
+        // "no active sandbox" (404 during a restart's stop→start window)
+        // tell us nothing about the preview itself — don't escalate to a
+        // destructive heal on them. Every other probe failure (network, 5xx
+        // from the sandbox, timeout) IS a signal to heal.
         const status = err instanceof ApiError ? err.status : 0;
-        if (status === 401 || status === 403) {
+        if (status === 401 || status === 403 || status === 404) {
           setState('idle');
         } else if (!cancelled) {
           await healNow();
