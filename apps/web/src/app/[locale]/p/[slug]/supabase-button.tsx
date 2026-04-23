@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { toast } from 'sonner';
 import { api } from '../../../../lib/api-client';
+import { useAuth } from '../../../../lib/auth-context';
 import {
   Dialog,
   DialogContent,
@@ -14,6 +15,8 @@ import { Button, Input, Label, Spinner } from '../../../../components/ui';
 
 interface Props {
   projectId: string | null;
+  /** Persisted per-project link — hydrated from the Project entity on reload. */
+  linkedProjectRef?: string | null;
 }
 
 interface SupabaseProject {
@@ -23,7 +26,8 @@ interface SupabaseProject {
   status: string;
 }
 
-export function SupabaseButton({ projectId }: Props) {
+export function SupabaseButton({ projectId, linkedProjectRef }: Props) {
+  const { status: authStatus } = useAuth();
   const [connected, setConnected] = useState<boolean | null>(null);
   const [open, setOpen] = useState(false);
   const [token, setToken] = useState('');
@@ -31,7 +35,15 @@ export function SupabaseButton({ projectId }: Props) {
   const [projects, setProjects] = useState<SupabaseProject[]>([]);
   const [loadingProjects, setLoadingProjects] = useState(false);
   const [linking, setLinking] = useState<string | null>(null);
-  const [linkedRef, setLinkedRef] = useState<string | null>(null);
+  // Seed from the Project entity so the "linked to …" chip survives reloads,
+  // even if the global integration fetch below hasn't returned yet (or fails).
+  const [linkedRef, setLinkedRef] = useState<string | null>(linkedProjectRef ?? null);
+
+  // If the project prop changes (e.g. navigating between projects) keep
+  // linkedRef in sync with what the server said.
+  useEffect(() => {
+    setLinkedRef(linkedProjectRef ?? null);
+  }, [linkedProjectRef]);
 
   const refreshProjects = useCallback(async () => {
     setLoadingProjects(true);
@@ -46,6 +58,11 @@ export function SupabaseButton({ projectId }: Props) {
   }, []);
 
   useEffect(() => {
+    // Wait for auth-context to finish hydrating before polling the
+    // integration. Without this gate the fetch can race the token refresh,
+    // hit an unauthenticated path, and leave the button stuck on "Connect"
+    // even though the integration exists server-side.
+    if (authStatus !== 'authenticated') return;
     let cancelled = false;
     (async () => {
       try {
@@ -60,7 +77,7 @@ export function SupabaseButton({ projectId }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [refreshProjects]);
+  }, [authStatus, refreshProjects]);
 
   async function onConnect(e: FormEvent) {
     e.preventDefault();
@@ -122,7 +139,11 @@ export function SupabaseButton({ projectId }: Props) {
     }
   }
 
-  if (connected === null) return null;
+  // While we're still waiting on the integration fetch, keep the button
+  // visible if we already know the project is linked (Project.supabaseProjectRef
+  // was populated on the server). That way a fast reload doesn't flash an
+  // empty toolbar — the linked chip stays in place.
+  if (connected === null && !linkedRef) return null;
 
   return (
     <>

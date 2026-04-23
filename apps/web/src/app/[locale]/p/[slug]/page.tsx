@@ -130,9 +130,19 @@ export default function ProjectWorkspacePage() {
             <div className="flex-1" />
             {/* Desktop: full toolbar */}
             <div className="hidden items-center gap-1.5 md:flex">
-              <GitHubPushButton projectId={project?.id ?? null} projectSlug={project?.slug ?? null} />
-              <SupabaseButton projectId={project?.id ?? null} />
-              <PublishButton projectId={project?.id ?? null} />
+              <GitHubPushButton
+                projectId={project?.id ?? null}
+                projectSlug={project?.slug ?? null}
+                repoUrl={project?.githubRepoUrl ?? null}
+              />
+              <SupabaseButton
+                projectId={project?.id ?? null}
+                linkedProjectRef={project?.supabaseProjectRef ?? null}
+              />
+              <PublishButton
+                projectId={project?.id ?? null}
+                projectDeploymentUrl={project?.vercelDeploymentUrl ?? null}
+              />
               <div className="mx-0.5 h-4 w-px bg-white/10" />
               <Button variant="ghost" size="sm" onClick={() => setSecretsOpen(true)}>
                 {t('workspace.env')}
@@ -166,13 +176,23 @@ export default function ProjectWorkspacePage() {
                 <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-white/10" />
                 <div className="flex flex-col gap-2">
                   <div onClick={() => setOverflowOpen(false)}>
-                    <GitHubPushButton projectId={project?.id ?? null} projectSlug={project?.slug ?? null} />
+                    <GitHubPushButton
+                projectId={project?.id ?? null}
+                projectSlug={project?.slug ?? null}
+                repoUrl={project?.githubRepoUrl ?? null}
+              />
                   </div>
                   <div onClick={() => setOverflowOpen(false)}>
-                    <SupabaseButton projectId={project?.id ?? null} />
+                    <SupabaseButton
+                projectId={project?.id ?? null}
+                linkedProjectRef={project?.supabaseProjectRef ?? null}
+              />
                   </div>
                   <div onClick={() => setOverflowOpen(false)}>
-                    <PublishButton projectId={project?.id ?? null} />
+                    <PublishButton
+                projectId={project?.id ?? null}
+                projectDeploymentUrl={project?.vercelDeploymentUrl ?? null}
+              />
                   </div>
                   <button
                     onClick={() => {

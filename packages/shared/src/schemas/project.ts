@@ -20,10 +20,15 @@ export const ProjectSchema = z.object({
     .max(48)
     .regex(/^[a-z0-9-]+$/),
   name: z.string().min(1).max(100),
-  description: z.string().max(500).optional(),
+  description: z.string().max(500).nullish(),
   template: ProjectTemplateSchema,
   visibility: ProjectVisibilitySchema,
-  githubRepoUrl: z.string().url().optional(),
+  // All three integrations are `string | null` in Postgres; nullish() accepts
+  // both `null` (what the API serializes) and `undefined` (for optional).
+  githubRepoUrl: z.string().url().nullish(),
+  vercelProjectId: z.string().nullish(),
+  vercelDeploymentUrl: z.string().nullish(),
+  supabaseProjectRef: z.string().nullish(),
   createdAt: z.date(),
   updatedAt: z.date(),
 });

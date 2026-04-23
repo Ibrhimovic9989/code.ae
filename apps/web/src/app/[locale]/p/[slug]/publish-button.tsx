@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { toast } from 'sonner';
 import { api } from '../../../../lib/api-client';
+import { useAuth } from '../../../../lib/auth-context';
 import {
   Dialog,
   DialogContent,
@@ -14,20 +15,30 @@ import { Button, Input, Label, Spinner } from '../../../../components/ui';
 
 interface Props {
   projectId: string | null;
+  /** Persisted per-project Vercel deployment URL from the Project entity. */
+  projectDeploymentUrl?: string | null;
 }
 
 type DeployState = 'BUILDING' | 'READY' | 'ERROR' | 'CANCELED' | 'QUEUED' | 'INITIALIZING' | 'IDLE';
 
-export function PublishButton({ projectId }: Props) {
+export function PublishButton({ projectId, projectDeploymentUrl }: Props) {
+  const { status: authStatus } = useAuth();
   const [vercelUsername, setVercelUsername] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
   const [token, setToken] = useState('');
   const [teamId, setTeamId] = useState('');
   const [connecting, setConnecting] = useState(false);
   const [publishing, setPublishing] = useState(false);
-  const [deployment, setDeployment] = useState<{ url: string; state: DeployState } | null>(null);
+  // Seed the deployment chip from the Project entity so "live at X" survives
+  // a reload even if the /deployment fetch hasn't returned yet.
+  const [deployment, setDeployment] = useState<{ url: string; state: DeployState } | null>(
+    projectDeploymentUrl
+      ? { url: normalizeUrl(projectDeploymentUrl), state: 'READY' }
+      : null,
+  );
 
   useEffect(() => {
+    if (authStatus !== 'authenticated') return;
     let cancelled = false;
     (async () => {
       try {
@@ -40,7 +51,7 @@ export function PublishButton({ projectId }: Props) {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [authStatus]);
 
   // Poll latest deployment while BUILDING/QUEUED so the UI reflects the current state.
   const refreshDeployment = useCallback(async () => {
@@ -197,6 +208,10 @@ export function PublishButton({ projectId }: Props) {
       </div>
     </>
   );
+}
+
+function normalizeUrl(url: string): string {
+  return url.startsWith('http') ? url : `https://${url}`;
 }
 
 function stateChip(state: DeployState) {

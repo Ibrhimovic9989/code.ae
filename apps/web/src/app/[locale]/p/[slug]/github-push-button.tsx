@@ -3,6 +3,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { toast } from 'sonner';
 import { api } from '../../../../lib/api-client';
+import { useAuth } from '../../../../lib/auth-context';
 import {
   Dialog,
   DialogContent,
@@ -15,21 +16,29 @@ import { Button, Input, Label, Spinner } from '../../../../components/ui';
 interface Props {
   projectId: string | null;
   projectSlug: string | null;
+  /** Persisted per-project repo URL from the Project entity. */
+  repoUrl?: string | null;
 }
 
-export function GitHubPushButton({ projectId, projectSlug }: Props) {
+export function GitHubPushButton({ projectId, projectSlug, repoUrl }: Props) {
+  const { status: authStatus } = useAuth();
   const [login, setLogin] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
   const [repoName, setRepoName] = useState(projectSlug ?? '');
   const [commitMessage, setCommitMessage] = useState('');
   const [isPrivate, setIsPrivate] = useState(true);
   const [busy, setBusy] = useState(false);
+  const hasRepo = Boolean(repoUrl);
 
   useEffect(() => {
     if (projectSlug) setRepoName(projectSlug);
   }, [projectSlug]);
 
   useEffect(() => {
+    // Wait for auth-context to finish hydrating (see supabase-button for the
+    // rationale). Without this gate the call races token refresh and the
+    // button gets stuck on "Connect GitHub" after every page reload.
+    if (authStatus !== 'authenticated') return;
     let cancelled = false;
     (async () => {
       try {
@@ -42,7 +51,7 @@ export function GitHubPushButton({ projectId, projectSlug }: Props) {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [authStatus]);
 
   async function onConnect() {
     try {
@@ -75,6 +84,17 @@ export function GitHubPushButton({ projectId, projectSlug }: Props) {
   }
 
   if (login === null) {
+    // If the Project has an existing githubRepoUrl, the user is clearly
+    // linked on the server even though the integration fetch hasn't returned
+    // yet (or failed). Show the Push button instead of "Connect" so a stale
+    // page reload doesn't misrepresent a connected project.
+    if (hasRepo) {
+      return (
+        <Button variant="secondary" onClick={() => setOpen(true)}>
+          Push to GitHub
+        </Button>
+      );
+    }
     return (
       <Button variant="secondary" onClick={() => void onConnect()}>
         Connect GitHub
