@@ -121,36 +121,58 @@ export class SendMessageUseCase {
     });
 
     const history = await this.messages.listBySession(session.id);
-    // Heal dangling tool_calls: if an assistant message has tool_calls but
-    // not every call id has a corresponding `tool` message after it in the
-    // history (happens when the user abandons an ask_user dialog and sends
-    // a new prompt instead, or when a dispatch threw before the tool-result
-    // append), OpenAI rejects the next request with:
-    //   "An assistant message with 'tool_calls' must be followed by tool
-    //    messages responding to each 'tool_call_id'"
-    // We splice in synthetic tool messages for the missing ids before the
-    // next user/assistant message so the transcript stays valid.
+    // Two OpenAI invariants we must guard before handing history to the
+    // provider — persisted rows drift from either over time and a single
+    // violation kills the whole chat with a 400:
+    //   (a) every assistant.tool_calls[i].id needs a matching tool message
+    //       immediately following (else "did not have response messages")
+    //   (b) every tool message's toolCallId must refer to an id emitted by
+    //       the most recent assistant.tool_calls block (else "must be a
+    //       response to a preceeding message with 'tool_calls'")
+    // Rewrite the history walker to enforce BOTH. The pattern: track the set
+    // of open (unanswered) ids the next tool messages are allowed to respond
+    // to; drop orphans; splice synthetic "abandoned" responses for gaps.
     const agentMessages: AgentMessage[] = [];
-    for (let i = 0; i < history.length; i++) {
-      const m = history[i];
+    const openToolCallIds = new Set<string>();
+    for (const m of history) {
       if (!m) continue;
-      agentMessages.push(this.toAgentMessage(m));
       const obj = m.toObject();
-      if (obj.role !== 'assistant' || !obj.toolCalls || obj.toolCalls.length === 0) continue;
 
-      const respondedIds = new Set<string>();
-      for (let j = i + 1; j < history.length; j++) {
-        const next = history[j];
-        if (!next) continue;
-        const nextObj = next.toObject();
-        if (nextObj.role !== 'tool') break; // next user/assistant ends the response block
-        if (nextObj.toolCallId) respondedIds.add(nextObj.toolCallId);
+      if (obj.role === 'tool') {
+        // Drop orphan tool messages — they have no preceding assistant with
+        // a matching tool_call id. Keeping them would violate invariant (b).
+        if (obj.toolCallId && openToolCallIds.has(obj.toolCallId)) {
+          agentMessages.push(this.toAgentMessage(m));
+          openToolCallIds.delete(obj.toolCallId);
+        }
+        continue;
       }
-      for (const call of obj.toolCalls) {
-        if (respondedIds.has(call.id)) continue;
+
+      // Any non-tool message ends the tool-response block — synthesize
+      // responses for any still-open tool_call ids so invariant (a) holds.
+      if (openToolCallIds.size > 0) {
+        for (const id of openToolCallIds) {
+          agentMessages.push({
+            role: 'tool',
+            toolCallId: id,
+            content: JSON.stringify({ abandoned: true, reason: 'no response persisted' }),
+          });
+        }
+        openToolCallIds.clear();
+      }
+
+      agentMessages.push(this.toAgentMessage(m));
+
+      if (obj.role === 'assistant' && obj.toolCalls && obj.toolCalls.length > 0) {
+        for (const call of obj.toolCalls) openToolCallIds.add(call.id);
+      }
+    }
+    // Trailing unanswered tool_calls at the very end of history.
+    if (openToolCallIds.size > 0) {
+      for (const id of openToolCallIds) {
         agentMessages.push({
           role: 'tool',
-          toolCallId: call.id,
+          toolCallId: id,
           content: JSON.stringify({ abandoned: true, reason: 'no response persisted' }),
         });
       }
