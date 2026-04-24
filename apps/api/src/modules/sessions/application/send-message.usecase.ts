@@ -178,6 +178,14 @@ export class SendMessageUseCase {
       }
     }
 
+    // ---- Context-window trimming --------------------------------------
+    // Long sessions accumulate large tool results (bun install logs, file
+    // reads, dev.log tails) that blow past the model's input limit. Cap
+    // individual tool contents, then if the rough char total still exceeds
+    // a soft budget, drop the oldest conversational turns while preserving
+    // tool-call / tool-response adjacency.
+    trimAgentMessagesForContext(agentMessages);
+
     const projectObj = project.toObject();
 
     const systemPrompt = buildSystemPrompt({
@@ -350,6 +358,56 @@ export class SendMessageUseCase {
       role: obj.role === 'system' ? 'system' : obj.role === 'user' ? 'user' : 'assistant',
       content: obj.content,
     };
+  }
+}
+
+/**
+ * Soft ceiling on the rough character total we hand to the model. The
+ * Azure OpenAI deployment caps at 272k input tokens; 4 chars ≈ 1 token
+ * is a conservative rule of thumb, so we keep well under the limit
+ * (800k chars ≈ 200k tokens) to leave room for the system prompt, tool
+ * schemas, and the streaming response buffer.
+ */
+const SOFT_CHAR_BUDGET = 800_000;
+const MAX_TOOL_CONTENT_CHARS = 8_000;
+
+/**
+ * In-place trim:
+ *   1. Cap every tool message's content at MAX_TOOL_CONTENT_CHARS — tool
+ *      outputs (bun install, file reads, dev.log) are the #1 bloat source.
+ *   2. If the total char count still exceeds SOFT_CHAR_BUDGET, drop the
+ *      oldest messages — but never sever an assistant.tool_calls block
+ *      from its tool responses. We drop in (assistant → tool*) chunks.
+ */
+function trimAgentMessagesForContext(messages: AgentMessage[]): void {
+  for (const m of messages) {
+    if (m.role === 'tool' && typeof m.content === 'string' && m.content.length > MAX_TOOL_CONTENT_CHARS) {
+      m.content =
+        m.content.slice(0, MAX_TOOL_CONTENT_CHARS) +
+        `\n…[truncated ${m.content.length - MAX_TOOL_CONTENT_CHARS} chars]`;
+    }
+  }
+
+  const byteCount = (): number => {
+    let n = 0;
+    for (const m of messages) {
+      if (typeof m.content === 'string') n += m.content.length;
+      if (m.role === 'assistant' && 'toolCalls' in m && m.toolCalls) {
+        for (const tc of m.toolCalls) n += JSON.stringify(tc.input).length + tc.name.length + 32;
+      }
+    }
+    return n;
+  };
+
+  while (byteCount() > SOFT_CHAR_BUDGET && messages.length > 8) {
+    // Drop a full turn-chunk starting from index 0. A chunk is:
+    // user (optional) → assistant → tool* → ... until next user OR end.
+    // Simplest: advance past the first non-tool message and any trailing
+    // tool messages belonging to it.
+    messages.shift();
+    while (messages.length > 0 && messages[0] && messages[0].role === 'tool') {
+      messages.shift();
+    }
   }
 }
 
