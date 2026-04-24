@@ -121,7 +121,40 @@ export class SendMessageUseCase {
     });
 
     const history = await this.messages.listBySession(session.id);
-    const agentMessages: AgentMessage[] = history.map((m) => this.toAgentMessage(m));
+    // Heal dangling tool_calls: if an assistant message has tool_calls but
+    // not every call id has a corresponding `tool` message after it in the
+    // history (happens when the user abandons an ask_user dialog and sends
+    // a new prompt instead, or when a dispatch threw before the tool-result
+    // append), OpenAI rejects the next request with:
+    //   "An assistant message with 'tool_calls' must be followed by tool
+    //    messages responding to each 'tool_call_id'"
+    // We splice in synthetic tool messages for the missing ids before the
+    // next user/assistant message so the transcript stays valid.
+    const agentMessages: AgentMessage[] = [];
+    for (let i = 0; i < history.length; i++) {
+      const m = history[i];
+      if (!m) continue;
+      agentMessages.push(this.toAgentMessage(m));
+      const obj = m.toObject();
+      if (obj.role !== 'assistant' || !obj.toolCalls || obj.toolCalls.length === 0) continue;
+
+      const respondedIds = new Set<string>();
+      for (let j = i + 1; j < history.length; j++) {
+        const next = history[j];
+        if (!next) continue;
+        const nextObj = next.toObject();
+        if (nextObj.role !== 'tool') break; // next user/assistant ends the response block
+        if (nextObj.toolCallId) respondedIds.add(nextObj.toolCallId);
+      }
+      for (const call of obj.toolCalls) {
+        if (respondedIds.has(call.id)) continue;
+        agentMessages.push({
+          role: 'tool',
+          toolCallId: call.id,
+          content: JSON.stringify({ abandoned: true, reason: 'no response persisted' }),
+        });
+      }
+    }
 
     const projectObj = project.toObject();
 

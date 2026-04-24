@@ -42,10 +42,17 @@ export function useErrorWatcher({
   agentBusy,
   onAutoFixRequested,
   intervalMs = 12_000,
-  dedupeTtlMs = 60_000,
+  // Widened from 60s to 10min. Same-fingerprint resubmissions were firing
+  // while the agent was stuck on a corrupted turn (OpenAI 400), spamming the
+  // chat with identical auto-fix messages every 12s.
+  dedupeTtlMs = 600_000,
 }: UseErrorWatcherArgs): void {
   // Map fingerprint -> timestamp last submitted. Survives across probes.
   const submittedRef = useRef<Map<string, number>>(new Map());
+  // Belt-and-suspenders: also remember the last composed prompt text so that
+  // if the fingerprint hash ever differs across sessions for the same root
+  // error (e.g. the file path shifts), we still don't spam the chat.
+  const lastPromptRef = useRef<{ text: string; ts: number } | null>(null);
   const agentBusyRef = useRef(agentBusy);
   agentBusyRef.current = agentBusy;
 
@@ -73,9 +80,16 @@ export function useErrorWatcher({
           // overloading the agent's context with parallel error chatter.
           const fresh = errors.find((e) => !submitted.has(e.fingerprint));
           if (fresh) {
-            submitted.set(fresh.fingerprint, now);
             const prompt = composePrompt(fresh);
-            onAutoFixRequested({ content: prompt, meta: { autoFix: fresh.fingerprint } });
+            // Second dedupe gate: exact-text match within the same TTL.
+            const last = lastPromptRef.current;
+            if (last && last.text === prompt && now - last.ts < dedupeTtlMs) {
+              submitted.set(fresh.fingerprint, now);
+            } else {
+              submitted.set(fresh.fingerprint, now);
+              lastPromptRef.current = { text: prompt, ts: now };
+              onAutoFixRequested({ content: prompt, meta: { autoFix: fresh.fingerprint } });
+            }
           }
         } catch {
           /* transient — next tick retries */
