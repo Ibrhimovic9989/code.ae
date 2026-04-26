@@ -18,6 +18,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       python3-pip \
       make \
       g++ \
+      procps \
     && rm -rf /var/lib/apt/lists/*
 
 RUN corepack enable && corepack prepare pnpm@9.12.0 --activate \

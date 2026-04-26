@@ -50,6 +50,12 @@ import { PreviewProxyController } from './interfaces/http/preview-proxy.controll
     DetectErrorsUseCase,
     MaterializeWorkspaceUseCase,
     ProjectFileRepository,
+    // Exported so SessionsModule's ToolDispatcher can inject them without
+    // re-providing — re-providing creates separate instances that lack the
+    // newly-required WorkspaceFileStore + ProjectFileRepository deps.
+    WriteFileUseCase,
+    ReadFileUseCase,
+    ListFilesUseCase,
   ],
 })
 export class WorkspaceModule {}
