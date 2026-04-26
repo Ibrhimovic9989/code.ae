@@ -106,7 +106,7 @@ export default function ProjectWorkspacePage() {
   const sandboxReady = sandboxReadyForWatcher;
 
   return (
-    <main className="h-[calc(100vh-3rem)]">
+    <main className="relative h-[calc(100vh-3rem)] w-full overflow-hidden">
       {sessStatus === 'starting' ? (
         <div className="flex h-full flex-col items-center justify-center gap-3">
           <Spinner className="h-6 w-6 text-neutral-400" />
@@ -121,13 +121,21 @@ export default function ProjectWorkspacePage() {
         </div>
       ) : (
         <>
-          {/* Top bar — collapses into project name + overflow on mobile */}
-          <div className="flex h-11 items-center gap-2 border-b border-white/5 bg-[rgb(var(--surface-0))] px-3 text-[13px] sm:gap-3 sm:px-4">
-            <span className="truncate font-medium text-neutral-100">{project?.name}</span>
-            <span className="hidden truncate font-mono text-[11px] text-neutral-500 sm:inline" dir="ltr">
+          {/* Top bar — futuristic glass with hairline + project chip */}
+          <div className="relative flex h-11 items-center gap-2 border-b border-white/5 bg-[rgb(var(--surface-0))]/80 px-3 text-[13px] backdrop-blur-md sm:gap-3 sm:px-4">
+            <div
+              aria-hidden
+              className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent"
+            />
+            <span className="flex h-1.5 w-1.5 shrink-0 rounded-full bg-brand-400 shadow-[0_0_8px_rgba(45,212,191,0.7)]" />
+            <span className="min-w-0 truncate font-medium text-neutral-100">{project?.name}</span>
+            <span
+              className="hidden min-w-0 truncate font-mono text-[10.5px] uppercase tracking-[0.18em] text-neutral-500 sm:inline"
+              dir="ltr"
+            >
               {project?.slug}
             </span>
-            <div className="flex-1" />
+            <div className="min-w-0 flex-1" />
             {/* Desktop: full toolbar */}
             <div className="hidden items-center gap-1.5 md:flex">
               <GitHubPushButton
@@ -212,13 +220,17 @@ export default function ProjectWorkspacePage() {
 
           {/* ─── Desktop layout: chat | code|preview ─── */}
           <div
-            className="hidden h-[calc(100%-4.5rem)] grid-cols-[420px_1fr] gap-px bg-white/5 lg:grid"
+            className="hidden h-[calc(100%-4.5rem)] w-full grid-cols-[minmax(360px,420px)_minmax(0,1fr)] gap-px overflow-hidden bg-white/5 lg:grid"
           >
-            <section className="min-h-0 bg-[rgb(var(--surface-0))]">
+            <section className="relative min-h-0 min-w-0 overflow-hidden bg-[rgb(var(--surface-0))]">
+              <div
+                aria-hidden
+                className="pointer-events-none absolute inset-y-0 right-0 w-px bg-gradient-to-b from-transparent via-white/10 to-transparent"
+              />
               <ChatPanel turns={turns} onSend={send} sending={sending} disabled={!sandboxReady} />
             </section>
 
-            <section className="flex min-h-0 flex-col bg-[rgb(var(--surface-0))]">
+            <section className="flex min-h-0 min-w-0 flex-col overflow-hidden bg-[rgb(var(--surface-0))]">
               <div className="flex h-10 shrink-0 items-center justify-between border-b border-white/5 bg-[rgb(var(--surface-0))]/60 px-3">
                 <Segmented
                   value={rightView}
@@ -353,7 +365,7 @@ export default function ProjectWorkspacePage() {
           </div>
 
           {/* Mobile bottom tab bar */}
-          <div className="fixed inset-x-0 bottom-0 z-30 flex h-14 items-stretch border-t border-white/10 bg-[rgb(var(--surface-0))]/90 backdrop-blur-xl lg:hidden">
+          <div className="fixed inset-x-0 bottom-0 z-30 flex h-14 w-full items-stretch overflow-hidden border-t border-white/10 bg-[rgb(var(--surface-0))]/90 backdrop-blur-xl lg:hidden">
             <MobileTab
               icon={<ChatIcon />}
               label="Chat"
@@ -376,29 +388,33 @@ export default function ProjectWorkspacePage() {
             />
           </div>
 
-          {/* Status bar — desktop only */}
+          {/* Status bar — desktop only, glassy hairline */}
           <div
-            className="hidden h-6 items-center justify-between border-t border-white/5 bg-[rgb(var(--surface-0))] px-3 font-mono text-[10.5px] text-neutral-500 lg:flex"
+            className="relative hidden h-6 items-center justify-between overflow-hidden border-t border-white/5 bg-[rgb(var(--surface-0))]/80 px-3 font-mono text-[10.5px] uppercase tracking-[0.18em] text-neutral-500 backdrop-blur-md lg:flex"
             dir="ltr"
           >
+            <div
+              aria-hidden
+              className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent"
+            />
             <div className="flex items-center gap-3">
               <span className="flex items-center gap-1.5">
                 <span
                   className={
                     sandboxReady
-                      ? 'h-1.5 w-1.5 rounded-full bg-emerald-500 shadow-[0_0_6px_rgba(52,211,153,0.6)]'
-                      : 'h-1.5 w-1.5 rounded-full bg-amber-500'
+                      ? 'h-1.5 w-1.5 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.7)]'
+                      : 'h-1.5 w-1.5 rounded-full bg-amber-400 animate-pulse'
                   }
                 />
-                sandbox {sandboxReady ? 'ready' : 'starting'}
+                sandbox · {sandboxReady ? 'ready' : 'starting'}
               </span>
               <span className="text-neutral-700">·</span>
-              <span>{project?.slug}</span>
+              <span className="text-neutral-400">{project?.slug}</span>
               {previewUrl ? (
                 <>
                   <span className="text-neutral-700">·</span>
                   <span className="flex items-center gap-1.5">
-                    <span className="h-1.5 w-1.5 rounded-full bg-sky-500" />
+                    <span className="h-1.5 w-1.5 rounded-full bg-brand-400 shadow-[0_0_6px_rgba(45,212,191,0.6)]" />
                     preview
                   </span>
                 </>
@@ -409,7 +425,7 @@ export default function ProjectWorkspacePage() {
               <span className="text-neutral-700">·</span>
               <span>{turns.length} turns</span>
               <span className="text-neutral-700">·</span>
-              <span>code.ae</span>
+              <span className="text-gradient">code.ae</span>
             </div>
           </div>
         </>

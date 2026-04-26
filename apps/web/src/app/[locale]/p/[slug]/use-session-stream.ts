@@ -65,6 +65,14 @@ export function useSessionStream(
     initialized.current = true;
     setStatus('starting');
     try {
+      // Guard against firing API calls when the parent has told us auth
+      // hasn't landed yet. Without this, an expired session loops
+      // /auth/refresh + /projects + /sandbox 401s before the parent's
+      // unauthenticated-redirect effect runs.
+      if (!api.token) {
+        setStatus('idle');
+        return;
+      }
       const { projects } = await api.listProjects();
       const p = projects.find((x) => x.slug === projectSlug);
       if (!p) throw new Error('Project not found');

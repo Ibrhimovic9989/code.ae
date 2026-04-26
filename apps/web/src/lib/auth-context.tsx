@@ -21,8 +21,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const hydrate = useCallback(async () => {
     try {
-      const { accessToken } = await api.refresh();
-      api.setAccessToken(accessToken);
+      // Use the dedup'd refresh — concurrent /auth/refresh calls (this
+      // hydrate, plus any in-flight 401 retry from elsewhere) MUST share
+      // one network call. The server rotates refresh tokens on every use,
+      // so a parallel POST sees the now-revoked token and 401s, locking
+      // the user out for the rest of the cookie's TTL.
+      const accessToken = await api.refreshAccessToken();
+      if (!accessToken) {
+        api.setAccessToken(null);
+        setState({ status: 'unauthenticated', user: null });
+        return;
+      }
       const { user } = await api.me();
       setState({ status: 'authenticated', user });
     } catch {

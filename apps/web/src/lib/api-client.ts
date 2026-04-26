@@ -36,7 +36,13 @@ class ApiClient {
     return API_URL;
   }
 
-  private async refreshAccessToken(): Promise<string | null> {
+  /**
+   * Public dedup'd refresh. Use this from anywhere (auth-context bootstrap,
+   * 401 retries) — multiple concurrent callers share ONE in-flight POST so
+   * the server's rotate-on-use refresh tokens don't race themselves into a
+   * permanent "Invalid refresh token" 401.
+   */
+  refreshAccessToken(): Promise<string | null> {
     if (this.refreshPromise) return this.refreshPromise;
     this.refreshPromise = (async () => {
       try {
@@ -376,7 +382,10 @@ class ApiClient {
 
     let res = await doFetch();
 
-    // Auto-refresh on 401 for any endpoint except refresh itself.
+    // Auto-refresh on 401 for any endpoint except refresh itself. The shared
+    // refreshPromise inside refreshAccessToken() collapses concurrent callers
+    // into one network call, which is critical because the server rotates
+    // refresh tokens — a second concurrent /auth/refresh would 401 forever.
     if (res.status === 401 && !path.startsWith('/auth/refresh') && !path.startsWith('/auth/login')) {
       const fresh = await this.refreshAccessToken();
       if (fresh) res = await doFetch();
