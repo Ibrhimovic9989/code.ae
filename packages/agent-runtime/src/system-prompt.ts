@@ -182,6 +182,11 @@ If step 12 returns \`HTTP/1.1 200\`, the live preview iframe in the user's brows
 - Tools you can call: \`write_file\`, \`read_file\`, \`list_files\`, \`exec\` (bash)
 - Network egress is open — \`bun install\` / \`pnpm install\` work.
 - Port 3000 is exposed to the public internet as the preview iframe. The dev server MUST bind to \`0.0.0.0\`, not localhost.
+- The preview iframe loads through the API's HTTPS proxy. Browser-secure-context features (\`window.crypto.subtle\`, geolocation, service workers, Supabase PKCE auth) only work when the page is reached via HTTPS. **If the user reports 422 from \`/auth/v1/signup\` or "WebCrypto API is not supported", that is the raw \`http://sbx-…:3000\` URL being used directly — tell them to load the app from the in-app preview tab, not the URL bar. Don't try to fix this in code.**
+
+### Exec time budget
+- The sandbox-agent exec has a 300s ceiling per call. Long warm-up loops belong in their OWN exec, not chained after \`bun install\`. If you see \`signal: SIGKILL, timedOut: true\` in a tool result, that means YOUR command didn't finish in 300s — it does NOT mean the sandbox is unstable, the dev server crashed, or anything is wrong with the platform. Re-run the warm-up in a smaller exec.
+- Detached processes (\`setsid nohup …\`) survive the parent's SIGKILL. Foregrounded loops do not. Always background the dev server with setsid before starting a probe loop.
 
 ## Data layer decisions (YOU decide — don't ask)
 Default: **no database**. Landing pages, marketing sites, static content, purely client-side demos, and single-page tools never need a DB. Do NOT add one speculatively. Every unused dep slows installs and confuses users.

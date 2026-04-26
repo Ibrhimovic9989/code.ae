@@ -17,6 +17,7 @@ export function createShellRoutes(config: AgentConfig): FastifyPluginAsync {
 
       const timeout = parsed.data.timeoutMs ?? config.SHELL_TIMEOUT_MS;
       const cwd = parsed.data.cwd === '.' ? config.WORKSPACE_ROOT : parsed.data.cwd;
+      const startedAt = Date.now();
 
       return new Promise((resolve) => {
         const proc = spawn('bash', ['-lc', parsed.data.command], {
@@ -30,6 +31,12 @@ export function createShellRoutes(config: AgentConfig): FastifyPluginAsync {
 
         const killTimer = setTimeout(() => {
           timedOut = true;
+          // Log so callers (the chat agent) can stop blaming the platform
+          // when long warm-up loops outrun the per-exec budget. Surface in
+          // stderr so the heal/detect recipes see why their output ended.
+          const msg = `[sandbox-agent] exec timed out after ${timeout}ms — SIGKILL parent shell. Detached background processes (setsid/nohup) survive; foreground loops do not.`;
+          app.log.warn(msg);
+          stderr += `\n${msg}\n`;
           proc.kill('SIGKILL');
         }, timeout);
 
@@ -44,6 +51,12 @@ export function createShellRoutes(config: AgentConfig): FastifyPluginAsync {
 
         proc.on('close', (code, signal) => {
           clearTimeout(killTimer);
+          const took = Date.now() - startedAt;
+          if (timedOut) {
+            app.log.warn(
+              `[sandbox-agent] exec finished after ${took}ms with timeout=${timeout}ms (signal=${signal})`,
+            );
+          }
           resolve(
             reply.send({
               exitCode: code,

@@ -162,7 +162,17 @@ export function PreviewPanel({
     }
   }
 
-  const displayUrl = previewUrl ? stripProtocol(previewUrl) : 'localhost:3000';
+  // Prefer the HTTPS proxy URL in the chrome — that's the URL the iframe
+  // actually loads, AND the only one where browser features that require a
+  // secure context (window.crypto.subtle, geolocation, service workers) work.
+  // Showing the raw http://sbx-...:3000 URL would mislead users (and the
+  // chat agent) into hitting an HTTP origin that breaks Supabase PKCE auth
+  // with WebCrypto-not-supported / 422 signup errors.
+  const displayUrl = iframeSrc
+    ? stripProtocol(iframeSrc.split('?')[0] ?? iframeSrc)
+    : previewUrl
+      ? stripProtocol(previewUrl)
+      : 'localhost:3000';
   const iframeWidth = VIEWPORT_WIDTHS[viewport];
   const constrained = viewport !== 'desktop';
 
@@ -231,7 +241,10 @@ export function PreviewPanel({
             )}
           </IconButton>
           {previewUrl ? (
-            <IconButton title="Open in new tab" onClick={() => window.open(previewUrl, '_blank', 'noopener')}>
+            <IconButton
+              title="Open in new tab (HTTPS — secure-context features like Supabase PKCE work here)"
+              onClick={() => window.open(iframeSrc ?? previewUrl, '_blank', 'noopener')}
+            >
               <svg viewBox="0 0 14 14" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.5">
                 <path d="M5 3H3v8h8V9M8 3h3v3M11 3l-5 5" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
