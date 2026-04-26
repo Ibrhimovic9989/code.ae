@@ -290,6 +290,7 @@ class ApiClient {
     locale?: 'ar' | 'en',
     toolResponses?: Array<{ id: string; content: unknown }>,
     mode?: 'plan' | 'build',
+    images?: string[],
   ): Promise<Response> {
     return fetch(`${API_URL}/sessions/${sessionId}/messages`, {
       method: 'POST',
@@ -303,6 +304,7 @@ class ApiClient {
         ...(locale ? { locale } : {}),
         ...(mode ? { mode } : {}),
         ...(toolResponses && toolResponses.length > 0 ? { toolResponses } : {}),
+        ...(images && images.length > 0 ? { images } : {}),
       }),
     });
   }

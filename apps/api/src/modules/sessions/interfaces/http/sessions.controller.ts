@@ -41,6 +41,9 @@ export class SessionsController {
           locale?: 'ar' | 'en';
           mode?: 'plan' | 'build';
           toolResponses?: Array<{ id: string; content: unknown }>;
+          /** Inline image data URLs attached to THIS user turn. Ephemeral —
+           *  not persisted; the model only sees them on the current request. */
+          images?: string[];
         }
       | undefined,
     @Req() req: FastifyRequest,
@@ -54,6 +57,9 @@ export class SessionsController {
       : user.locale === 'en' ? 'en'
       : 'ar';
     const mode: 'plan' | 'build' = body?.mode === 'plan' ? 'plan' : 'build';
+    const images = Array.isArray(body?.images)
+      ? body!.images.filter((u): u is string => typeof u === 'string').slice(0, 6)
+      : [];
 
     applySseHeaders(req, reply);
 
@@ -65,6 +71,7 @@ export class SessionsController {
         locale,
         toolResponses,
         mode,
+        images,
       )) {
         reply.raw.write(`event: ${ev.type}\n`);
         reply.raw.write(`data: ${JSON.stringify(ev)}\n\n`);

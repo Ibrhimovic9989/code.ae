@@ -114,6 +114,20 @@ export class AzureOpenAIProvider extends AgentProvider {
         continue;
       }
 
+      if (m.role === 'user' && m.images && m.images.length > 0) {
+        // Multimodal user message — model needs an array of content parts.
+        const parts: Array<
+          | { type: 'text'; text: string }
+          | { type: 'image_url'; image_url: { url: string } }
+        > = [];
+        if (m.content) parts.push({ type: 'text', text: m.content });
+        for (const url of m.images) {
+          parts.push({ type: 'image_url', image_url: { url } });
+        }
+        msgs.push({ role: 'user', content: parts });
+        continue;
+      }
+
       if (m.role === 'user' || m.role === 'assistant' || m.role === 'system') {
         msgs.push({ role: m.role, content: m.content });
       }

@@ -42,6 +42,8 @@ export interface SendInput {
   toolResponses?: Array<{ id: string; content: unknown }>;
   /** Plan mode: read-only exploration + written plan, no edits/commands. */
   mode?: 'plan' | 'build';
+  /** Inline image data URLs attached to this turn. Ephemeral. */
+  images?: string[];
   /** Client-side metadata — never serialized to the API. */
   meta?: { autoFix?: string };
 }
@@ -109,7 +111,8 @@ export function useSessionStream(
       const content = normalized.content ?? '';
       const toolResponses = normalized.toolResponses ?? [];
       const mode: 'plan' | 'build' = normalized.mode === 'plan' ? 'plan' : 'build';
-      if (!content.trim() && toolResponses.length === 0) return;
+      const images = normalized.images ?? [];
+      if (!content.trim() && toolResponses.length === 0 && images.length === 0) return;
 
       setSending(true);
 
@@ -154,7 +157,7 @@ export function useSessionStream(
       });
 
       try {
-        const res = await api.streamMessage(session.id, content, locale, toolResponses, mode);
+        const res = await api.streamMessage(session.id, content, locale, toolResponses, mode, images);
         if (!res.ok && res.status !== 200) {
           const text = await res.text();
           throw new Error(`HTTP ${res.status}: ${text}`);

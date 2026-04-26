@@ -20,17 +20,38 @@ export function ChatPanel({ turns, onSend, sending, disabled }: ChatPanelProps) 
   const t = useTranslations();
   const [value, setValue] = useState('');
   const [mode, setMode] = useState<'plan' | 'build'>('build');
+  // Pending image attachments for the next message. Stored as data URLs so
+  // they're sent inline; nothing is uploaded until the user actually submits.
+  const [images, setImages] = useState<string[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [turns]);
 
+  async function attachFiles(files: FileList | File[] | null) {
+    if (!files) return;
+    const list = Array.from(files);
+    const accepted: string[] = [];
+    for (const f of list) {
+      if (!f.type.startsWith('image/')) continue;
+      // Hard cap per file at 4 MB so we don't blow context with full-res
+      // photos. The model gets the original bytes — no client-side resize.
+      if (f.size > 4 * 1024 * 1024) continue;
+      accepted.push(await fileToDataUrl(f));
+      if (images.length + accepted.length >= 6) break; // server caps at 6
+    }
+    if (accepted.length > 0) setImages((prev) => [...prev, ...accepted].slice(0, 6));
+  }
+
   function onSubmit(e: FormEvent) {
     e.preventDefault();
-    if (!value.trim() || sending) return;
-    onSend({ content: value, mode });
+    if (sending) return;
+    if (!value.trim() && images.length === 0) return;
+    onSend({ content: value, mode, ...(images.length > 0 ? { images } : {}) });
     setValue('');
+    setImages([]);
   }
 
   function handleAnswer(answer: { callId: string; choices: string[]; text: string }) {
@@ -74,12 +95,82 @@ export function ChatPanel({ turns, onSend, sending, disabled }: ChatPanelProps) 
               </span>
             ) : null}
           </div>
+
+          {/* Image attachments preview row */}
+          {images.length > 0 ? (
+            <div className="flex flex-wrap gap-2">
+              {images.map((src, i) => (
+                <div
+                  key={i}
+                  className="group relative h-16 w-16 overflow-hidden rounded-md border border-white/10 bg-white/[0.03]"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={src} alt="" className="h-full w-full object-cover" />
+                  <button
+                    type="button"
+                    onClick={() => setImages((prev) => prev.filter((_, j) => j !== i))}
+                    className="absolute right-0.5 top-0.5 inline-flex h-5 w-5 items-center justify-center rounded-full bg-black/70 text-white opacity-0 transition-opacity group-hover:opacity-100"
+                    aria-label="Remove attachment"
+                  >
+                    <svg viewBox="0 0 12 12" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="1.5">
+                      <path d="M3 3l6 6M9 3l-6 6" strokeLinecap="round" />
+                    </svg>
+                  </button>
+                </div>
+              ))}
+            </div>
+          ) : null}
+
           <div className="flex gap-2">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              multiple
+              hidden
+              onChange={(e) => {
+                void attachFiles(e.target.files);
+                if (fileInputRef.current) fileInputRef.current.value = '';
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={disabled || sending || images.length >= 6}
+              title="Attach images (paste also works)"
+              className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-md border border-white/10 bg-white/[0.02] text-neutral-400 transition-colors hover:border-white/30 hover:bg-white/[0.04] hover:text-neutral-200 disabled:opacity-40"
+              aria-label="Attach images"
+            >
+              <svg viewBox="0 0 18 18" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.6">
+                <path
+                  d="M14.4 8.5l-5.5 5.5a3.5 3.5 0 0 1-5-5l6.5-6.5a2.4 2.4 0 0 1 3.4 3.4L7.5 12.3a1.3 1.3 0 0 1-1.8-1.8l5.3-5.3"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </button>
             <textarea
               value={value}
               onChange={(e) => setValue(e.target.value)}
+              onPaste={(e) => {
+                const items = e.clipboardData?.items;
+                if (!items) return;
+                const files: File[] = [];
+                for (const item of items) {
+                  if (item.kind === 'file') {
+                    const f = item.getAsFile();
+                    if (f && f.type.startsWith('image/')) files.push(f);
+                  }
+                }
+                if (files.length > 0) {
+                  e.preventDefault();
+                  void attachFiles(files);
+                }
+              }}
               placeholder={
-                mode === 'plan' ? 'Describe what you want planned…' : t('workspace.placeholder')
+                mode === 'plan'
+                  ? 'Describe what you want planned…'
+                  : t('workspace.placeholder')
               }
               disabled={disabled || sending}
               rows={2}
@@ -96,7 +187,7 @@ export function ChatPanel({ turns, onSend, sending, disabled }: ChatPanelProps) 
               variant="primary"
               size="lg"
               className="shrink-0 self-stretch"
-              disabled={disabled || sending || !value.trim()}
+              disabled={disabled || sending || (!value.trim() && images.length === 0)}
             >
               {sending ? <Spinner /> : mode === 'plan' ? 'Plan' : t('workspace.send')}
             </Button>
@@ -105,6 +196,15 @@ export function ChatPanel({ turns, onSend, sending, disabled }: ChatPanelProps) 
       </form>
     </div>
   );
+}
+
+async function fileToDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result ?? ''));
+    reader.onerror = () => reject(reader.error ?? new Error('Failed to read file'));
+    reader.readAsDataURL(file);
+  });
 }
 
 function ModeToggle({

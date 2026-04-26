@@ -18,6 +18,12 @@ export interface AgentMessage {
   content: string;
   toolCalls?: AgentToolCall[];
   toolCallId?: string;
+  /**
+   * Optional inline images attached to a user message. Each entry is a full
+   * data URL (`data:image/png;base64,…`) or an https URL. Provider serializes
+   * these as multimodal content parts. Ignored on non-user roles.
+   */
+  images?: string[];
 }
 
 export interface AgentToolCall {

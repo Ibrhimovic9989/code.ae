@@ -63,6 +63,12 @@ export class SendMessageUseCase {
     userLocale: 'ar' | 'en' = 'ar',
     toolResponses: ToolResponseInput[] = [],
     mode: 'plan' | 'build' = 'build',
+    /**
+     * Inline images attached to THIS user turn (data URLs). Not persisted —
+     * the model only sees them on the current request. Re-asking after a
+     * reload won't have them.
+     */
+    images: string[] = [],
   ): AsyncGenerator<SessionStreamEvent> {
     if (!userContent.trim() && toolResponses.length === 0) {
       throw new ValidationError('Either message content or tool responses required');
@@ -185,6 +191,20 @@ export class SendMessageUseCase {
     // a soft budget, drop the oldest conversational turns while preserving
     // tool-call / tool-response adjacency.
     trimAgentMessagesForContext(agentMessages);
+
+    // Attach the current turn's images (if any) to the most recent user
+    // message in the agent's view. This is ephemeral — DB rows stay text
+    // only, so re-asking after a reload doesn't replay attachments. The
+    // provider serializes user messages with images as multimodal content.
+    if (images.length > 0) {
+      for (let i = agentMessages.length - 1; i >= 0; i--) {
+        const msg = agentMessages[i];
+        if (msg && msg.role === 'user') {
+          msg.images = images;
+          break;
+        }
+      }
+    }
 
     const projectObj = project.toObject();
 
