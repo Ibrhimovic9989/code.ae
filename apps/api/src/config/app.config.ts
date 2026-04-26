@@ -26,6 +26,11 @@ export const appConfigSchema = z.object({
   /// Contributor on the storage account).
   WORKSPACE_FILES_ACCOUNT_URL: z.string().url(),
   WORKSPACE_FILES_CONTAINER: z.string().default('workspace-files'),
+
+  /// The API's own public origin (HTTPS), used to compute per-project preview
+  /// proxy URLs that we inject into sandbox env so the agent can pass a
+  /// correct `emailRedirectTo` to Supabase. Falls back to localhost in dev.
+  API_PUBLIC_URL: z.string().url().default('http://localhost:4000'),
 });
 
 export type AppConfig = z.infer<typeof appConfigSchema>;

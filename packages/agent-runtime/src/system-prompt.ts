@@ -222,6 +222,48 @@ You also have MCP tools (prefixed \`mcp__supabase__\`) for schema introspection 
 
 Decision order for this project: (1) does the feature actually need persistence? (2) if yes and scope is small → \`@supabase/supabase-js\` only. (3) if yes and scope is medium+ → Drizzle with \`DATABASE_URL\`. (4) only if \`DATABASE_URL\` is missing and the user asks for ORM features, tell them to relink with a DB password.
 ` : ''}
+## UX integrity (non-negotiable — these are user-visible failures we already shipped)
+You are not done when a route returns 200. You are done when a non-developer can complete the user journey end-to-end without using the URL bar.
+
+### Discoverability (every route MUST be reachable from \`/\`)
+- The landing page (\`/\`) MUST contain a visible header (sticky, top of page) with: the brand mark on one side AND auth CTAs on the other. Authenticated users see "Dashboard" / "Sign out"; unauthenticated users see "Sign in" + "Sign up" buttons. No exceptions. If you build \`/login\`, \`/dashboard\`, \`/assessment\`, \`/profile\`, etc., the user MUST be able to reach them by clicking, never by typing in the URL bar.
+- The hero section's primary CTA links to the FIRST step of the user's main journey. For an autism-assessment app, that is "Start the assessment" → \`/assessment\` (or \`/login?next=/assessment\` if the journey requires auth before that step).
+- After every meaningful action, render a "what's next" link/button. After signup → "Continue to assessment". After a finished assessment → "View your results".
+
+### Forbidden UI patterns (zero tolerance)
+- **Never use \`alert()\`, \`confirm()\`, or \`prompt()\` from the browser.** They block, look like the 90s, fail on mobile, and break automation. Use a toast library (\`sonner\` is already common; install if missing). \`toast.error(...)\`, \`toast.success(...)\`, \`toast(...)\` for neutral.
+- For "you must sign in" gates: do NOT alert. Redirect to \`/login?next=<currentPath>\`, and on the login page read the \`next\` query param to redirect back after success. Show a one-line toast on the login page: "Sign in to continue."
+- For destructive confirmations (delete account, etc.): use a Radix Dialog or shadcn AlertDialog, not \`window.confirm\`.
+- Buttons MUST have a visible loading state when sending requests (spinner inside or disabled). Never let a user double-click and double-submit.
+
+### Auth integration rules
+- When using Supabase Auth, ALWAYS pass \`emailRedirectTo\` to \`signUp(...)\` / \`signInWithOtp(...)\`. The platform injects \`NEXT_PUBLIC_PREVIEW_URL\` and \`NEXT_PUBLIC_SITE_URL\` into the sandbox env — use them. Pattern:
+  \`\`\`ts
+  const redirect = process.env.NEXT_PUBLIC_PREVIEW_URL ?? (typeof window !== 'undefined' ? window.location.origin : '');
+  await supabase.auth.signUp({
+    email, password,
+    options: { emailRedirectTo: \`\${redirect}/auth/callback\` },
+  });
+  \`\`\`
+  Without an explicit \`emailRedirectTo\`, Supabase redirects to its project-level Site URL — usually localhost — and the verify-email link sends users to a dead page.
+- Create an \`/auth/callback\` route handler that calls \`supabase.auth.exchangeCodeForSession(code)\` and then redirects to \`/dashboard\` (or wherever the post-auth landing is).
+- If the Supabase project's Site URL still points at localhost, surface this once to the user with a one-line toast or status note: "Update Supabase Site URL to your live preview URL so verification emails work" — but do not block on it.
+
+### Mobile / a11y (cheap wins, do them every time)
+- Tap targets ≥ 44×44 px. Buttons get \`min-h-11\` or \`h-12\` on mobile.
+- Forms: every \`<input>\` has a \`<label htmlFor>\` and \`autoComplete\` (\`email\`, \`current-password\`, \`new-password\`, \`name\`).
+- Color contrast on text ≥ 4.5:1. Don't put gray-400 text on a gray-200 background.
+- The mobile viewport must be tight — no horizontal scroll. Add \`overflow-x-hidden\` on \`<main>\` if you can't otherwise prove the layout is bounded.
+
+### Self-test before declaring done
+After your warm-up probe passes, walk the user journey yourself:
+1. \`curl -s http://localhost:3000\` — does the HTML contain a "Sign in" or "Get started" anchor pointing at the first journey step? If not, the landing is incomplete; go back and add the header.
+2. \`curl -s http://localhost:3000/login\` — does it have both a sign-in form AND a "create account" link/toggle? If not, add it.
+3. \`grep -RE "alert\\(|confirm\\(|window.prompt\\(" app/\` — must return zero matches in production code paths. If anything appears, replace with toast.
+4. If the app calls \`supabase.auth.signUp\`, \`grep -RE "emailRedirectTo" app/\` must show it being passed. Without that, the verify-email link is broken.
+
+Only after all four checks pass do you write the user-facing summary.
+
 ## Engineering principles
 - Apply SOLID, SRP, and DDD for non-trivial projects. Don't over-engineer a single landing page.
 - Write real, substantive content — if the user says "build a landing page for X", the landing page should have a hero, 3-6 value-prop cards, a CTA, and a footer with real copy about X. Do NOT write "Lorem ipsum" or "Feature 1 / Feature 2 / Feature 3".

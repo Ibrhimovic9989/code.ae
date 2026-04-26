@@ -1,4 +1,5 @@
 import { Injectable, Logger, Optional } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { ForbiddenError, NotFoundError, SandboxSpecSchema } from '@code-ae/shared';
 import { ProjectRepository } from '../../projects/domain/project.repository';
 import { SandboxRepository } from '../domain/sandbox.repository';
@@ -6,6 +7,7 @@ import { OrchestratorClient } from '../domain/orchestrator-client';
 import { SandboxEntity } from '../domain/sandbox.entity';
 import { ResolveSecretsForSandboxUseCase } from '../../secrets/application/resolve-secrets-for-sandbox.usecase';
 import { MaterializeWorkspaceUseCase } from '../../workspace/application/materialize-workspace.usecase';
+import type { AppConfig } from '../../../config/app.config';
 
 @Injectable()
 export class StartSandboxUseCase {
@@ -16,6 +18,7 @@ export class StartSandboxUseCase {
     private readonly sandboxes: SandboxRepository,
     private readonly orchestrator: OrchestratorClient,
     private readonly resolveSecrets: ResolveSecretsForSandboxUseCase,
+    private readonly config: ConfigService<AppConfig, true>,
     @Optional() private readonly materialize?: MaterializeWorkspaceUseCase,
   ) {}
 
@@ -37,13 +40,26 @@ export class StartSandboxUseCase {
     this.logger.log(`start: creating new sandbox for project=${projectId}`);
     const env = await this.resolveSecrets.execute(projectId, 'development');
 
+    // Inject platform-level NEXT_PUBLIC_* so the agent's Supabase signup
+    // code can pass a correct emailRedirectTo without hardcoding localhost.
+    // Both keys point at the HTTPS preview-proxy URL the user actually sees
+    // in the iframe — verifying an email lands them back in the running app,
+    // not on a dead localhost link.
+    const apiPublicUrl = this.config.get('API_PUBLIC_URL', { infer: true });
+    const previewBase = `${apiPublicUrl}/api/v1/preview/${projectId}`;
+    const platformEnv: Record<string, string> = {
+      ...env,
+      NEXT_PUBLIC_PREVIEW_URL: previewBase,
+      NEXT_PUBLIC_SITE_URL: previewBase,
+    };
+
     const spec = SandboxSpecSchema.parse({
       projectId,
       image: 'code-ae-sandbox:latest',
       cpuCores: 1,
       memoryGb: 2,
       envRefs: [],
-      env,
+      env: platformEnv,
       ports: [3000, 4000],
       idleTimeoutSeconds: 600,
     });
