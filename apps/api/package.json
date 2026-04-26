@@ -25,6 +25,7 @@
     "@prisma/client": "^6.1.0",
     "@azure/identity": "^4.5.0",
     "@azure/keyvault-secrets": "^4.9.0",
+    "@azure/storage-blob": "^12.26.0",
     "@code-ae/shared": "workspace:*",
     "@code-ae/agent-runtime": "workspace:*",
     "@code-ae/templates": "workspace:*",

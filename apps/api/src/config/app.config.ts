@@ -20,6 +20,12 @@ export const appConfigSchema = z.object({
   GITHUB_OAUTH_POST_REDIRECT: z.string().url().default('http://localhost:3000/dashboard'),
 
   MAGIC_MCP_API_KEY: z.string().min(1).optional(),
+
+  /// Azure Blob storage account URL for the per-project workspace files.
+  /// Auth is via the API container app's managed identity (Storage Blob Data
+  /// Contributor on the storage account).
+  WORKSPACE_FILES_ACCOUNT_URL: z.string().url(),
+  WORKSPACE_FILES_CONTAINER: z.string().default('workspace-files'),
 });
 
 export type AppConfig = z.infer<typeof appConfigSchema>;

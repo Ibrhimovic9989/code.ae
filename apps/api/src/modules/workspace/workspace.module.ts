@@ -6,6 +6,9 @@ import { SandboxRepository } from '../sandboxes/domain/sandbox.repository';
 import { PrismaSandboxRepository } from '../sandboxes/infrastructure/prisma-sandbox.repository';
 import { SandboxAgentClient } from './domain/sandbox-agent.client';
 import { HttpSandboxAgentClient } from './infrastructure/http-sandbox-agent.client';
+import { ProjectFileRepository } from './domain/project-file.repository';
+import { PrismaProjectFileRepository } from './infrastructure/prisma-project-file.repository';
+import { WorkspaceFileStoreModule } from '../../infrastructure/workspace-file-store/workspace-file-store.module';
 import { ResolveActiveSandbox } from './application/resolve-active-sandbox';
 import { WriteFileUseCase } from './application/write-file.usecase';
 import { ReadFileUseCase } from './application/read-file.usecase';
@@ -16,15 +19,17 @@ import { ExecCommandUseCase } from './application/exec-command.usecase';
 import { StreamCommandUseCase } from './application/stream-command.usecase';
 import { HealPreviewUseCase } from './application/heal-preview.usecase';
 import { DetectErrorsUseCase } from './application/detect-errors.usecase';
+import { MaterializeWorkspaceUseCase } from './application/materialize-workspace.usecase';
 import { WorkspaceController } from './interfaces/http/workspace.controller';
 import { PreviewProxyController } from './interfaces/http/preview-proxy.controller';
 
 @Module({
-  imports: [AuthModule, ProjectsModule, SandboxesModule],
+  imports: [AuthModule, ProjectsModule, SandboxesModule, WorkspaceFileStoreModule],
   controllers: [WorkspaceController, PreviewProxyController],
   providers: [
     { provide: SandboxRepository, useClass: PrismaSandboxRepository },
     { provide: SandboxAgentClient, useClass: HttpSandboxAgentClient },
+    { provide: ProjectFileRepository, useClass: PrismaProjectFileRepository },
     ResolveActiveSandbox,
     WriteFileUseCase,
     ReadFileUseCase,
@@ -35,7 +40,16 @@ import { PreviewProxyController } from './interfaces/http/preview-proxy.controll
     StreamCommandUseCase,
     HealPreviewUseCase,
     DetectErrorsUseCase,
+    MaterializeWorkspaceUseCase,
   ],
-  exports: [ExecCommandUseCase, ResolveActiveSandbox, SandboxAgentClient, HealPreviewUseCase, DetectErrorsUseCase],
+  exports: [
+    ExecCommandUseCase,
+    ResolveActiveSandbox,
+    SandboxAgentClient,
+    HealPreviewUseCase,
+    DetectErrorsUseCase,
+    MaterializeWorkspaceUseCase,
+    ProjectFileRepository,
+  ],
 })
 export class WorkspaceModule {}

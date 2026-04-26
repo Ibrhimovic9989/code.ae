@@ -1,10 +1,11 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { ForbiddenError, NotFoundError, SandboxSpecSchema } from '@code-ae/shared';
 import { ProjectRepository } from '../../projects/domain/project.repository';
 import { SandboxRepository } from '../domain/sandbox.repository';
 import { OrchestratorClient } from '../domain/orchestrator-client';
 import { SandboxEntity } from '../domain/sandbox.entity';
 import { ResolveSecretsForSandboxUseCase } from '../../secrets/application/resolve-secrets-for-sandbox.usecase';
+import { MaterializeWorkspaceUseCase } from '../../workspace/application/materialize-workspace.usecase';
 
 @Injectable()
 export class StartSandboxUseCase {
@@ -15,6 +16,7 @@ export class StartSandboxUseCase {
     private readonly sandboxes: SandboxRepository,
     private readonly orchestrator: OrchestratorClient,
     private readonly resolveSecrets: ResolveSecretsForSandboxUseCase,
+    @Optional() private readonly materialize?: MaterializeWorkspaceUseCase,
   ) {}
 
   async execute(projectId: string, ownerId: string): Promise<SandboxEntity> {
@@ -75,6 +77,22 @@ export class StartSandboxUseCase {
       stoppedAt: null,
     });
     await this.sandboxes.save(sandbox);
+
+    // Materialize the persisted workspace into the fresh container as soon as
+    // the agent endpoint is reachable. Best-effort and fire-and-forget — a
+    // slow Blob read shouldn't block the start response. The agent's
+    // file-write endpoint queues per-path so concurrent calls are safe.
+    if (this.materialize && sandbox.toObject().agentUrl && sandbox.toObject().agentToken) {
+      const endpoint = {
+        baseUrl: sandbox.toObject().agentUrl ?? '',
+        token: sandbox.toObject().agentToken ?? '',
+      };
+      this.materialize.execute(projectId, endpoint).catch((err) => {
+        this.logger.warn(
+          `materialize after start failed for project=${projectId}: ${err instanceof Error ? err.message : err}`,
+        );
+      });
+    }
 
     return sandbox;
   }

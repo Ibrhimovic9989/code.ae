@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { AuthModule } from '../auth/auth.module';
 import { ProjectsModule } from '../projects/projects.module';
 import { SecretsModule } from '../secrets/secrets.module';
+import { WorkspacePersistenceModule } from '../workspace/workspace-persistence.module';
 import { SandboxRepository } from './domain/sandbox.repository';
 import { OrchestratorClient } from './domain/orchestrator-client';
 import { PrismaSandboxRepository } from './infrastructure/prisma-sandbox.repository';
@@ -12,7 +13,7 @@ import { StopSandboxUseCase } from './application/stop-sandbox.usecase';
 import { SandboxesController } from './interfaces/http/sandboxes.controller';
 
 @Module({
-  imports: [AuthModule, ProjectsModule, SecretsModule],
+  imports: [AuthModule, ProjectsModule, SecretsModule, WorkspacePersistenceModule],
   controllers: [SandboxesController],
   providers: [
     { provide: SandboxRepository, useClass: PrismaSandboxRepository },
