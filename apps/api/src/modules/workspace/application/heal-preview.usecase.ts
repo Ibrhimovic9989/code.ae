@@ -1,6 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { SandboxAgentClient } from '../domain/sandbox-agent.client';
 import { ResolveActiveSandbox } from './resolve-active-sandbox';
+import { SandboxRepository } from '../../sandboxes/domain/sandbox.repository';
+
+/** Mirrors the watchdog grace in detect-errors. Heal must NOT run mid-compile. */
+const COLD_START_GRACE_MS = 90_000;
 
 export interface HealPreviewResult {
   healed: boolean;
@@ -30,22 +34,45 @@ export class HealPreviewUseCase {
   constructor(
     private readonly resolve: ResolveActiveSandbox,
     private readonly agent: SandboxAgentClient,
+    private readonly sandboxes: SandboxRepository,
   ) {}
 
   async execute(projectId: string, ownerId: string): Promise<HealPreviewResult> {
     const started = Date.now();
     const endpoint = await this.resolve.execute(projectId, ownerId);
 
+    // Cold-start gate: while Next.js is mid-first-compile (no manifests yet
+    // by design), running the destructive recipe blows away the very
+    // .next/ directory Next is writing into. Refuse to heal during the
+    // grace window — the watchdog should already be skipping us here, but
+    // belt-and-suspenders if a manual click slipped through.
+    const sandbox = await this.sandboxes.findActiveByProject(projectId);
+    if (sandbox) {
+      const ageMs = Date.now() - sandbox.toObject().createdAt.getTime();
+      if (ageMs < COLD_START_GRACE_MS) {
+        this.logger.log(
+          `heal: skipped — sandbox is in cold-start grace (${COLD_START_GRACE_MS - ageMs}ms left) project=${projectId}`,
+        );
+        return {
+          healed: true,
+          tookSeconds: 0,
+          detail: `cold-start grace — Next.js is still doing its first compile. No-op.`,
+        };
+      }
+    }
+
+    // Prefer the baked heal script; fall back to the inline recipe for
+    // legacy sandbox images that predate the /usr/local/bin/code-ae-heal
+    // bake. The script and the inline recipe are byte-for-byte the same
+    // logic — single source of truth in code-ae-heal.sh — so this is purely
+    // about not breaking older containers during the rollout window.
     const script = this.buildRecipe();
-    // IMPORTANT: do NOT wrap this in `bash -lc ${JSON.stringify(script)}`.
-    // The sandbox-agent already calls `spawn('bash', ['-lc', command])` on
-    // whatever we send as `command`. Double-wrapping caused the inner bash
-    // to receive the script as a single double-quoted string with literal
-    // \n between statements, which made the whole recipe collapse to one
-    // line and fail with "syntax error: unexpected end of file" — no
-    // CAE_RESULT marker ever got echoed, hence the `verdict=''` logs.
+    const command =
+      'if command -v code-ae-heal >/dev/null 2>&1; then code-ae-heal; else ' +
+      script +
+      '; fi';
     const res = await this.agent.exec(endpoint, {
-      command: script,
+      command,
       cwd: '.',
       timeoutMs: 220_000,
     });

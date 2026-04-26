@@ -1,6 +1,16 @@
 import { Injectable } from '@nestjs/common';
 import { SandboxAgentClient } from '../domain/sandbox-agent.client';
 import { ResolveActiveSandbox } from './resolve-active-sandbox';
+import { SandboxRepository } from '../../sandboxes/domain/sandbox.repository';
+
+/**
+ * Cold-start grace window. For the first N seconds after a sandbox is
+ * created, Next.js's first-route compile is in flight and `routes-manifest.json`
+ * legitimately doesn't exist yet — the watchdog must NOT classify that as an
+ * error or the chat agent gets spammed with auto-fix prompts that interrupt
+ * the very compile that's about to write the manifest.
+ */
+const COLD_START_GRACE_MS = 90_000;
 
 export type DetectedErrorKind =
   | 'module-not-found'
@@ -28,6 +38,14 @@ export interface DetectErrorsResult {
   logTail: string;
   /** Probe status at the time of detection. */
   previewStatus: number | null;
+  /**
+   * True when we suppressed errors because the sandbox is still inside its
+   * cold-start grace window. The watchdog uses this to avoid firing
+   * auto-fix prompts at the chat agent during the first compile.
+   */
+  coldStart?: boolean;
+  /** Approximate ms remaining in the grace window, when coldStart is true. */
+  coldStartUntilMs?: number;
 }
 
 /**
@@ -42,10 +60,28 @@ export class DetectErrorsUseCase {
   constructor(
     private readonly resolve: ResolveActiveSandbox,
     private readonly agent: SandboxAgentClient,
+    private readonly sandboxes: SandboxRepository,
   ) {}
 
   async execute(projectId: string, ownerId: string): Promise<DetectErrorsResult> {
     const endpoint = await this.resolve.execute(projectId, ownerId);
+
+    // Cold-start grace check happens BEFORE the agent probe — if we're
+    // still in the grace window, return a healthy-shaped response immediately
+    // so the watchdog doesn't fire heal mid-compile.
+    const sandbox = await this.sandboxes.findActiveByProject(projectId);
+    if (sandbox) {
+      const ageMs = Date.now() - sandbox.toObject().createdAt.getTime();
+      if (ageMs < COLD_START_GRACE_MS) {
+        return {
+          errors: [],
+          logTail: '',
+          previewStatus: null,
+          coldStart: true,
+          coldStartUntilMs: COLD_START_GRACE_MS - ageMs,
+        };
+      }
+    }
 
     // Single shell call: probe + tail + capture status.
     const script = `

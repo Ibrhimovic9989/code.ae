@@ -53,6 +53,9 @@ export function useErrorWatcher({
   // if the fingerprint hash ever differs across sessions for the same root
   // error (e.g. the file path shifts), we still don't spam the chat.
   const lastPromptRef = useRef<{ text: string; ts: number } | null>(null);
+  // Two-strike counter per fingerprint: count consecutive sightings before
+  // we escalate to the chat agent. Damps out cold-start flakes (E).
+  const strikeRef = useRef<Map<string, number>>(new Map());
   const agentBusyRef = useRef(agentBusy);
   agentBusyRef.current = agentBusy;
 
@@ -66,8 +69,27 @@ export function useErrorWatcher({
       // Skip this probe if the agent is mid-turn — queue for the next cycle.
       if (!agentBusyRef.current) {
         try {
-          const { errors } = await api.detectPreviewErrors(projectId);
+          const res = (await api.detectPreviewErrors(projectId)) as {
+            errors: Array<{ kind: string; message: string; file?: string; fingerprint: string }>;
+            previewStatus?: number | null;
+            coldStart?: boolean;
+            coldStartUntilMs?: number;
+          };
           if (cancelled) return;
+
+          // (F) Cold-start suppression: while the API says we're inside the
+          // first-compile grace window, surface NOTHING to the agent. A long
+          // first compile that's silently in progress would otherwise produce
+          // a torrent of "missing routes-manifest.json" auto-fixes that
+          // restart Next mid-compile and feed the loop forever.
+          if (res.coldStart) {
+            // Stretch the next probe past the grace window so we re-arm
+            // once the compile has had its full window, not 12s in.
+            const wait = Math.max(intervalMs, (res.coldStartUntilMs ?? intervalMs) + 5000);
+            if (!cancelled) timer = setTimeout(tick, wait);
+            return;
+          }
+
           const now = Date.now();
           const submitted = submittedRef.current;
 
@@ -76,10 +98,25 @@ export function useErrorWatcher({
             if (now - ts > dedupeTtlMs) submitted.delete(fp);
           }
 
-          // Find the first fresh error — we only submit one per tick to avoid
-          // overloading the agent's context with parallel error chatter.
-          const fresh = errors.find((e) => !submitted.has(e.fingerprint));
+          // (E) Only fire heal-style auto-fix on errors that are PERSISTENT
+          // and POST-COLD-START. Manifest-missing errors during a fresh boot
+          // are expected — only escalate after we've seen the same fingerprint
+          // twice across consecutive ticks (so transient compile jitter
+          // doesn't spam chat).
+          const fresh = res.errors.find((e) => !submitted.has(e.fingerprint));
           if (fresh) {
+            // Two-strike rule for enoent-manifest specifically — by far the
+            // most common false positive on cold starts. First sighting just
+            // arms the strike counter; only the second sighting submits.
+            if (fresh.kind === 'enoent-manifest') {
+              const seen = strikeRef.current.get(fresh.fingerprint) ?? 0;
+              if (seen < 1) {
+                strikeRef.current.set(fresh.fingerprint, seen + 1);
+                if (!cancelled) timer = setTimeout(tick, intervalMs);
+                return;
+              }
+            }
+
             const prompt = composePrompt(fresh);
             // Second dedupe gate: exact-text match within the same TTL.
             const last = lastPromptRef.current;
@@ -90,6 +127,10 @@ export function useErrorWatcher({
               lastPromptRef.current = { text: prompt, ts: now };
               onAutoFixRequested({ content: prompt, meta: { autoFix: fresh.fingerprint } });
             }
+          } else {
+            // No fresh error — clear strike counter so future flakes start
+            // fresh.
+            strikeRef.current.clear();
           }
         } catch {
           /* transient — next tick retries */

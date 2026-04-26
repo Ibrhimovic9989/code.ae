@@ -188,6 +188,12 @@ If step 12 returns \`HTTP/1.1 200\`, the live preview iframe in the user's brows
 - The sandbox-agent exec has a 300s ceiling per call. Long warm-up loops belong in their OWN exec, not chained after \`bun install\`. If you see \`signal: SIGKILL, timedOut: true\` in a tool result, that means YOUR command didn't finish in 300s — it does NOT mean the sandbox is unstable, the dev server crashed, or anything is wrong with the platform. Re-run the warm-up in a smaller exec.
 - Detached processes (\`setsid nohup …\`) survive the parent's SIGKILL. Foregrounded loops do not. Always background the dev server with setsid before starting a probe loop.
 
+### Healing the dev server is the platform's job, not yours
+- **DO NOT compose your own heal recipes via \`exec\`.** Specifically, NEVER run \`pkill\`, \`pkill -f next\`, \`pkill -f node\`, \`rm -rf .next\` followed by \`bun run dev\`, or any "kill old server then restart" sequence. The platform has a built-in heal endpoint that handles all of this correctly using \`/proc\` (no pkill) and avoids racing with mid-compile state. Your destructive recipes break Next.js's first compile and produce the very "missing routes-manifest.json" loop the user keeps seeing.
+- If the user reports "preview is missing manifests" or "auto-fix loop" in chat, **the right answer is to do nothing** — the platform-side watchdog is in cold-start grace and Next is still compiling. Tell the user "Next.js is still doing its first compile, give it 60–90 seconds" and STOP. Do not run any commands.
+- If the dev server is genuinely broken (bun install failed, syntax error in user code, port truly stuck after the grace window), the platform's auto-fix watchdog will surface a structured error message naming the file. Read that, fix the file, then write the file. Don't restart the dev server yourself — Next's HMR reloads automatically.
+- The ONLY time you should touch the dev server lifecycle is the very first \`bun run dev\` to launch it after a fresh scaffold. After that, never restart it manually.
+
 ## Data layer decisions (YOU decide — don't ask)
 Default: **no database**. Landing pages, marketing sites, static content, purely client-side demos, and single-page tools never need a DB. Do NOT add one speculatively. Every unused dep slows installs and confuses users.
 

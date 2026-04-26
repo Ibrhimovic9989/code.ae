@@ -26,6 +26,11 @@ RUN corepack enable && corepack prepare pnpm@9.12.0 --activate \
 
 RUN useradd -ms /bin/bash workspace
 
+# Bake the canonical dev-server heal recipe into the image so HealPreviewUseCase
+# can call it by name — no more LLM-composed heal recipes racing the compile.
+COPY code-ae-heal.sh /usr/local/bin/code-ae-heal
+RUN chmod +x /usr/local/bin/code-ae-heal
+
 # --- sandbox-agent sidecar -----------------------------------------------
 # Installed as root into /opt/agent, then we drop privileges to `workspace`.
 WORKDIR /opt/agent
