@@ -83,35 +83,27 @@ export class DetectErrorsUseCase {
       }
     }
 
-    // Single shell call: probe + tail + capture status.
-    const script = `
-set +e
-STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 3 http://localhost:3000 2>/dev/null || echo "000")
-BODY=$(curl -s --max-time 3 http://localhost:3000 2>/dev/null)
-echo "CAE_STATUS=$STATUS"
-echo "CAE_BODY_START"
-echo "$BODY" | head -c 4000
-echo ""
-echo "CAE_BODY_END"
-echo "CAE_LOG_START"
-tail -120 /tmp/dev.log 2>/dev/null
-echo "CAE_LOG_END"
-`;
-
-    // Send script raw — the sandbox-agent already wraps it in `bash -lc`.
-    // (Double-wrapping broke the heal recipe; same bug class here.)
+    // Single source of truth: the baked /usr/local/bin/code-ae-detect-errors
+    // script in the sandbox image. Emits CAE_STATUS, CAE_STACK,
+    // CAE_BODY_*, CAE_LOG_* markers we parse below.
     const res = await this.agent.exec(endpoint, {
-      command: script,
+      command: 'code-ae-detect-errors',
       cwd: '.',
       timeoutMs: 15_000,
     });
 
     const stdout = res.stdout ?? '';
     const status = this.extractInt(stdout, /CAE_STATUS=(\d+)/);
+    const stackMatch = /CAE_STACK=([a-z0-9-]+)/i.exec(stdout);
+    const stack = (stackMatch?.[1] ?? 'unknown') as
+      | 'vite-react'
+      | 'next'
+      | 'unknown'
+      | 'no-workspace';
     const body = this.extractBetween(stdout, 'CAE_BODY_START', 'CAE_BODY_END');
     const log = this.extractBetween(stdout, 'CAE_LOG_START', 'CAE_LOG_END');
 
-    const errors = this.classify(body, log, status);
+    const errors = this.classify(body, log, status, stack);
 
     return {
       errors,
@@ -120,7 +112,12 @@ echo "CAE_LOG_END"
     };
   }
 
-  private classify(body: string, log: string, status: number | null): DetectedError[] {
+  private classify(
+    body: string,
+    log: string,
+    status: number | null,
+    stack: 'vite-react' | 'next' | 'unknown' | 'no-workspace',
+  ): DetectedError[] {
     const out: DetectedError[] = [];
     const seen = new Set<string>();
     const push = (err: Omit<DetectedError, 'fingerprint'>) => {
@@ -130,32 +127,67 @@ echo "CAE_LOG_END"
       out.push({ ...err, fingerprint: fp });
     };
 
-    // Runtime errors Next emits to dev.log (most reliable signal).
-    // Example: " ⨯ [Error: ENOENT: no such file or directory, open '/.../app-paths-manifest.json']"
-    const enoentRe = /ENOENT: no such file or directory, open '([^']+)'/g;
     let m: RegExpExecArray | null;
-    while ((m = enoentRe.exec(log)) !== null) {
-      const file = m[1];
-      if (!file) continue;
-      push({
-        kind: 'enoent-manifest',
-        message: `Missing manifest: ${file}`,
-        file,
-      });
-      if (out.length >= 10) break;
+
+    // Next-specific: missing build manifest under .next/. Vite has no
+    // equivalent on-disk artifact, so this check is gated to next.
+    if (stack === 'next') {
+      // Example: " ⨯ [Error: ENOENT: no such file or directory, open '/.../app-paths-manifest.json']"
+      const enoentRe = /ENOENT: no such file or directory, open '([^']+\.next\/[^']+)'/g;
+      while ((m = enoentRe.exec(log)) !== null) {
+        const file = m[1];
+        if (!file) continue;
+        push({
+          kind: 'enoent-manifest',
+          message: `Missing manifest: ${file}`,
+          file,
+        });
+        if (out.length >= 10) break;
+      }
     }
 
-    // Module not found — in body (Next renders an overlay HTML) or log.
-    const modRe = /Module not found: Can't resolve '([^']+)'/g;
-    for (const haystack of [body, log]) {
-      while ((m = modRe.exec(haystack)) !== null) {
+    // Vite-specific: "[vite] Internal server error" + "Failed to resolve
+    // import" patterns. These show up in /tmp/dev.log, not in the iframe
+    // body (Vite returns 500 with the bare error).
+    if (stack === 'vite-react') {
+      if (/\[vite\] Internal server error/i.test(log)) {
+        const excerpt = this.firstMatchContext(
+          log,
+          /\[vite\] Internal server error[\s\S]{0,400}/,
+        );
+        push({ kind: 'failed-to-compile', message: excerpt || 'Vite internal server error' });
+      }
+      const viteResolveRe = /Failed to resolve import "([^"]+)" from "([^"]+)"/g;
+      while ((m = viteResolveRe.exec(log)) !== null) {
         const mod = m[1];
+        const file = m[2];
         if (!mod) continue;
         push({
           kind: 'module-not-found',
           message: `Module not found: ${mod}`,
-          file: mod,
+          ...(file ? { file } : {}),
         });
+      }
+      const viteTransformRe = /Transform failed with \d+ error(?:s)?:[\s\S]{0,200}/g;
+      while ((m = viteTransformRe.exec(log)) !== null) {
+        push({ kind: 'syntax-error', message: m[0].slice(0, 300) });
+      }
+    }
+
+    // Module not found (Next form) — body or log. Skipped on Vite since
+    // Vite uses "Failed to resolve import" handled above.
+    if (stack !== 'vite-react') {
+      const modRe = /Module not found: Can't resolve '([^']+)'/g;
+      for (const haystack of [body, log]) {
+        while ((m = modRe.exec(haystack)) !== null) {
+          const mod = m[1];
+          if (!mod) continue;
+          push({
+            kind: 'module-not-found',
+            message: `Module not found: ${mod}`,
+            file: mod,
+          });
+        }
       }
     }
 
