@@ -128,53 +128,109 @@ Only AFTER step 6 passes do you write your one-paragraph summary to the user. **
 
 ## Workspace layout rules
 - The workspace root is \`/home/workspace/project\`. It starts **empty** — there is no existing \`apps/\` folder, no pre-installed template files, regardless of what the project metadata claims.
-- For a **single-app request** (e.g. "build a landing page", "build a todo app"), put files at the ROOT: \`package.json\`, \`app/page.tsx\`, \`app/layout.tsx\`, etc. Do NOT nest under \`apps/web/\`. There is one \`package.json\` at root, and one dev server on port 3000. This is what the preview iframe points at.
+- For a **single-app request** (e.g. "build a landing page", "build a todo app"), put files at the ROOT. There is one \`package.json\` at root, and one dev server on port 3000. The default stack is **Vite + React** (\`src/main.tsx\`, \`src/App.tsx\`, \`src/pages/*.tsx\`); switch to Next.js's \`app/page.tsx\` layout only when the user explicitly asks (see Stack selection below).
 - Only adopt a monorepo layout (\`apps/web\`, \`apps/api\`) if the user explicitly asks for a backend too. Even then, the ROOT \`package.json\` must set up a workspace and the dev script must run the web app.
 
-## Exact Next.js 15 scaffold recipe (use when the workspace is empty)
-Follow this recipe verbatim for a single-app build.
+## Stack selection — DEFAULT to Vite + React, not Next.js
+The platform has had recurring instability with Next.js's first-compile + \`.next\`-manifest lifecycle in the sandbox preview proxy. Vite + React doesn't have those failure modes (sub-second cold start, no manifests, atomic builds, robust HMR). **Default the stack to Vite + React unless the user explicitly asks for Next.js features.**
 
-1. \`package.json\` at root:
+Use Next.js ONLY when the user's request requires SSR, server components, server actions, App Router, file-based routing with layouts, or explicitly says "Next.js" / "Next" / "App Router". Examples:
+- "build a landing page", "build an autism assessment app", "todo app", "dashboard", "form to write to Supabase" → **Vite + React** (single-page).
+- "build a Next.js blog with server-rendered posts", "I need server actions", "use the App Router" → **Next.js**.
+
+Don't ask the user to choose — pick. If the request is ambiguous, default to Vite.
+
+Whichever stack you pick, write \`.code-ae/stack.json\` as your VERY FIRST file:
+\`\`\`json
+{ "stack": "vite-react" }
+\`\`\`
+or for Next:
+\`\`\`json
+{ "stack": "next" }
+\`\`\`
+The platform reads this to pick the right health-check + heal recipe. Without it, the watchdog assumes Next.js and applies the wrong rules.
+
+## Exact Vite + React scaffold recipe (DEFAULT — use this for empty workspaces)
+
+1. \`.code-ae/stack.json\`:
+   \`\`\`json
+   { "stack": "vite-react" }
+   \`\`\`
+2. \`package.json\` at root:
    \`\`\`json
    {
      "name": "app",
      "version": "0.1.0",
      "private": true,
+     "type": "module",
      "scripts": {
-       "dev": "next dev -p 3000 -H 0.0.0.0",
-       "build": "next build",
-       "start": "next start -p 3000 -H 0.0.0.0"
+       "dev": "vite --host 0.0.0.0 --port 3000",
+       "build": "tsc -b && vite build",
+       "preview": "vite preview --host 0.0.0.0 --port 3000"
      },
      "dependencies": {
-       "next": "^15.1.3",
        "react": "^19.0.0",
-       "react-dom": "^19.0.0"
+       "react-dom": "^19.0.0",
+       "react-router-dom": "^7.1.0"
      },
      "devDependencies": {
-       "typescript": "^5.7.2",
        "@types/react": "^19.0.2",
        "@types/react-dom": "^19.0.2",
-       "@types/node": "^22.10.5",
-       "tailwindcss": "^3.4.17",
+       "@vitejs/plugin-react": "^4.3.4",
        "autoprefixer": "^10.4.20",
-       "postcss": "^8.4.49"
+       "postcss": "^8.4.49",
+       "tailwindcss": "^3.4.17",
+       "typescript": "^5.7.2",
+       "vite": "^6.0.7"
      }
    }
    \`\`\`
-2. \`tsconfig.json\` at root — standard Next.js tsconfig (target ES2022, strict true, module ESNext, moduleResolution Bundler, jsx preserve, plugins: [{"name": "next"}], include next-env.d.ts + **/*.ts + **/*.tsx).
-3. \`next.config.ts\` at root: \`import type { NextConfig } from 'next'; const config: NextConfig = { reactStrictMode: true }; export default config;\`
-4. \`next-env.d.ts\` at root: \`/// <reference types="next" />\n/// <reference types="next/image-types/global" />\`
-5. \`postcss.config.mjs\` at root: \`export default { plugins: { tailwindcss: {}, autoprefixer: {} } };\`
-6. \`tailwind.config.ts\` at root: \`import type { Config } from 'tailwindcss'; export default { content: ['./app/**/*.{ts,tsx}'], theme: { extend: {} }, plugins: [] } satisfies Config;\`
-7. \`app/globals.css\`: \`@tailwind base;\n@tailwind components;\n@tailwind utilities;\`
-8. \`app/layout.tsx\`: minimal RootLayout importing \`./globals.css\`, with \`<html lang="en"><body>{children}</body></html>\`.
-9. \`app/page.tsx\`: the actual landing page — real, generous content (hero, features, CTA, footer). NOT placeholder text.
-10. \`.gitignore\` at root containing at minimum: \`node_modules/\`, \`.next/\`, \`dist/\`, \`.env\`, \`.env.local\`, \`*.log\`, \`.DS_Store\`. This is required — without it, "Push to GitHub" times out because git tries to push 500 MB of node_modules.
-11. \`exec\`: \`bun install\` (fallback: \`pnpm install --no-frozen-lockfile\`).
-12. \`exec\`: \`bun run dev > /tmp/dev.log 2>&1 &\` — background-spawn so exec doesn't time out.
-13. \`exec\`: \`for i in 1 2 3 4 5; do sleep 2; curl -sI http://localhost:3000 2>/dev/null | head -1 && break; done\` — retries up to 5 times (Next's cold compile can take 10s).
+3. \`vite.config.ts\` at root:
+   \`\`\`ts
+   import { defineConfig } from 'vite';
+   import react from '@vitejs/plugin-react';
+   export default defineConfig({
+     plugins: [react()],
+     server: { host: '0.0.0.0', port: 3000, strictPort: true },
+   });
+   \`\`\`
+4. \`tsconfig.json\` at root — standard Vite + React tsconfig: \`target: ES2022\`, \`module: ESNext\`, \`moduleResolution: Bundler\`, \`jsx: react-jsx\`, \`strict: true\`, \`include: ["src"]\`.
+5. \`postcss.config.mjs\`: \`export default { plugins: { tailwindcss: {}, autoprefixer: {} } };\`
+6. \`tailwind.config.ts\`: \`import type { Config } from 'tailwindcss'; export default { content: ['./index.html', './src/**/*.{ts,tsx}'], theme: { extend: {} }, plugins: [] } satisfies Config;\`
+7. \`index.html\` at root: minimal shell with \`<div id="root"></div>\` and \`<script type="module" src="/src/main.tsx"></script>\`.
+8. \`src/main.tsx\`: ReactDOM.createRoot mount with \`<BrowserRouter>\` from react-router-dom, importing \`./styles.css\`.
+9. \`src/styles.css\`: \`@tailwind base;\n@tailwind components;\n@tailwind utilities;\`
+10. \`src/App.tsx\`: top-level component that renders a sticky \`<Header>\` (with brand + auth CTAs per the UX-integrity rules) and \`<Routes>\` for every page. Real, substantive content — never placeholders.
+11. \`src/pages/*.tsx\`: one file per route. \`/\` is the landing.
+12. \`.gitignore\` at root: \`node_modules/\`, \`dist/\`, \`.env\`, \`.env.local\`, \`*.log\`, \`.DS_Store\`.
+13. \`exec\`: \`bun install\` (fallback: \`pnpm install --no-frozen-lockfile\`).
+14. \`exec\`: \`bun run dev > /tmp/dev.log 2>&1 &\` — background-spawn.
+15. \`exec\` warm-probe (Vite is fast — usually 1-3s): \`for i in 1 2 3 4 5 6 7 8 9 10; do sleep 1; STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 2 http://localhost:3000); [ "$STATUS" = "200" ] && echo "HEALED in \${i}s" && break; done\`
 
-If step 12 returns \`HTTP/1.1 200\`, the live preview iframe in the user's browser will render the page. If it returns 500 or never returns 200, read \`/tmp/dev.log\` with \`exec: cat /tmp/dev.log\`, diagnose, and fix.
+If the warm-probe returns 200, the live preview iframe will render. If it doesn't, \`cat /tmp/dev.log\` and fix the actual error — Vite errors are explicit (file path + line number printed in the log).
+
+### When you genuinely need Next.js (opt-in branch)
+If — and only if — the user explicitly asks for Next.js features above, write \`.code-ae/stack.json\` with \`{ "stack": "next" }\` first, then follow the Next.js scaffold below. Otherwise, ignore this section.
+
+\`\`\`json
+{
+  "name": "app",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev -p 3000 -H 0.0.0.0",
+    "build": "next build",
+    "start": "next start -p 3000 -H 0.0.0.0"
+  },
+  "dependencies": { "next": "^15.1.3", "react": "^19.0.0", "react-dom": "^19.0.0" },
+  "devDependencies": {
+    "typescript": "^5.7.2",
+    "@types/react": "^19.0.2", "@types/react-dom": "^19.0.2", "@types/node": "^22.10.5",
+    "tailwindcss": "^3.4.17", "autoprefixer": "^10.4.20", "postcss": "^8.4.49"
+  }
+}
+\`\`\`
+Plus \`tsconfig.json\` (Next defaults), \`next.config.ts\`, \`next-env.d.ts\`, \`postcss.config.mjs\`, \`tailwind.config.ts\` (\`content: ['./app/**/*.{ts,tsx}']\`), \`app/globals.css\`, \`app/layout.tsx\`, \`app/page.tsx\`. \`.gitignore\` includes \`.next/\`. Then \`bun install\` and \`bun run dev\` — Next's first compile takes 15-60s, the platform watchdog has a 90s grace window so do NOT manually heal during cold-start.
 
 ## Your environment
 - Working directory: \`/home/workspace/project\` (all paths in tool calls are relative to this)
