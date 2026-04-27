@@ -12,6 +12,9 @@ export const appConfigSchema = z.object({
   AZURE_OPENAI_ENDPOINT: z.string().url(),
   AZURE_OPENAI_API_KEY: z.string().min(1),
   AZURE_OPENAI_DEPLOYMENT: z.string().default('gpt-5.2-chat'),
+  /// Optional second deployment for the "Smart" tier the user can opt into
+  /// when a task is complex. Falls back to the default deployment when unset.
+  AZURE_OPENAI_DEPLOYMENT_PRO: z.string().optional(),
   AZURE_OPENAI_API_VERSION: z.string().default('2025-04-01-preview'),
 
   GITHUB_OAUTH_CLIENT_ID: z.string().min(1).optional(),

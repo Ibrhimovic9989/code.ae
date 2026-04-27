@@ -20,6 +20,10 @@ export function ChatPanel({ turns, onSend, sending, disabled }: ChatPanelProps) 
   const t = useTranslations();
   const [value, setValue] = useState('');
   const [mode, setMode] = useState<'plan' | 'build'>('build');
+  // Reasoning tier — Standard for everyday tasks, Smart for complex ones.
+  // We deliberately avoid surfacing model names anywhere in the UI; the
+  // user picks intent ("how hard is this task?"), not a specific model.
+  const [tier, setTier] = useState<'standard' | 'smart'>('standard');
   // Pending image attachments for the next message. Stored as data URLs so
   // they're sent inline; nothing is uploaded until the user actually submits.
   const [images, setImages] = useState<string[]>([]);
@@ -49,7 +53,12 @@ export function ChatPanel({ turns, onSend, sending, disabled }: ChatPanelProps) 
     e.preventDefault();
     if (sending) return;
     if (!value.trim() && images.length === 0) return;
-    onSend({ content: value, mode, ...(images.length > 0 ? { images } : {}) });
+    onSend({
+      content: value,
+      mode,
+      tier,
+      ...(images.length > 0 ? { images } : {}),
+    });
     setValue('');
     setImages([]);
   }
@@ -87,11 +96,18 @@ export function ChatPanel({ turns, onSend, sending, disabled }: ChatPanelProps) 
         className="border-t border-white/5 bg-[rgb(var(--surface-0))] p-2.5 sm:p-3"
       >
         <div className="mx-auto flex max-w-3xl flex-col gap-2">
-          <div className="flex items-center justify-between">
-            <ModeToggle value={mode} onChange={setMode} disabled={sending} />
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <ModeToggle value={mode} onChange={setMode} disabled={sending} />
+              <TierToggle value={tier} onChange={setTier} disabled={sending} />
+            </div>
             {mode === 'plan' ? (
-              <span className="text-[11px] text-neutral-500">
+              <span className="hidden text-[11px] text-neutral-500 sm:inline">
                 Plan mode — agent writes a plan, doesn&apos;t edit files.
+              </span>
+            ) : tier === 'smart' ? (
+              <span className="hidden text-[11px] text-neutral-500 sm:inline">
+                Smart — slower, deeper reasoning for complex tasks.
               </span>
             ) : null}
           </div>
@@ -250,6 +266,72 @@ function ModeToggle({
         </button>
       ))}
     </div>
+  );
+}
+
+function TierToggle({
+  value,
+  onChange,
+  disabled,
+}: {
+  value: 'standard' | 'smart';
+  onChange: (v: 'standard' | 'smart') => void;
+  disabled?: boolean;
+}) {
+  return (
+    <div
+      className={cn(
+        'inline-flex rounded-md border border-white/10 bg-white/[0.02] p-0.5 text-[11.5px] font-medium',
+        disabled && 'opacity-50',
+      )}
+      role="tablist"
+      aria-label="Reasoning tier"
+    >
+      {(['standard', 'smart'] as const).map((tier) => (
+        <button
+          key={tier}
+          type="button"
+          role="tab"
+          aria-selected={value === tier}
+          disabled={disabled}
+          onClick={() => onChange(tier)}
+          className={cn(
+            'flex h-6 items-center gap-1.5 rounded px-2 transition-colors',
+            value === tier
+              ? tier === 'smart'
+                ? 'bg-brand-400 text-neutral-900'
+                : 'bg-white text-neutral-900'
+              : 'text-neutral-400 hover:text-white',
+          )}
+          title={
+            tier === 'smart'
+              ? 'Smart — deeper reasoning, slower responses. Use for complex tasks.'
+              : 'Standard — fast everyday responses.'
+          }
+        >
+          {tier === 'smart' ? <SmartIcon /> : <StandardIcon />}
+          <span>{tier === 'smart' ? 'Smart' : 'Standard'}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function StandardIcon() {
+  return (
+    <svg viewBox="0 0 14 14" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="1.6">
+      <path d="M3 7l3 3 5-6" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+function SmartIcon() {
+  return (
+    <svg viewBox="0 0 14 14" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="1.4">
+      <path
+        d="M7 1.5l1.4 3 3.1.4-2.3 2.2.6 3.1L7 8.7l-2.8 1.5.6-3.1L2.5 4.9l3.1-.4L7 1.5z"
+        strokeLinejoin="round"
+      />
+    </svg>
   );
 }
 

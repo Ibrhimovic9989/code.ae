@@ -44,6 +44,8 @@ export class SessionsController {
           /** Inline image data URLs attached to THIS user turn. Ephemeral —
            *  not persisted; the model only sees them on the current request. */
           images?: string[];
+          /** User-selected reasoning tier. */
+          tier?: 'standard' | 'smart';
         }
       | undefined,
     @Req() req: FastifyRequest,
@@ -60,6 +62,7 @@ export class SessionsController {
     const images = Array.isArray(body?.images)
       ? body!.images.filter((u): u is string => typeof u === 'string').slice(0, 6)
       : [];
+    const tier: 'standard' | 'smart' = body?.tier === 'smart' ? 'smart' : 'standard';
 
     applySseHeaders(req, reply);
 
@@ -72,6 +75,7 @@ export class SessionsController {
         toolResponses,
         mode,
         images,
+        tier,
       )) {
         reply.raw.write(`event: ${ev.type}\n`);
         reply.raw.write(`data: ${JSON.stringify(ev)}\n\n`);

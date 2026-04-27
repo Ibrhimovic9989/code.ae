@@ -44,6 +44,8 @@ export interface SendInput {
   mode?: 'plan' | 'build';
   /** Inline image data URLs attached to this turn. Ephemeral. */
   images?: string[];
+  /** Reasoning tier; "smart" routes to the larger model for complex tasks. */
+  tier?: 'standard' | 'smart';
   /** Client-side metadata — never serialized to the API. */
   meta?: { autoFix?: string };
 }
@@ -112,6 +114,7 @@ export function useSessionStream(
       const toolResponses = normalized.toolResponses ?? [];
       const mode: 'plan' | 'build' = normalized.mode === 'plan' ? 'plan' : 'build';
       const images = normalized.images ?? [];
+      const tier: 'standard' | 'smart' = normalized.tier === 'smart' ? 'smart' : 'standard';
       if (!content.trim() && toolResponses.length === 0 && images.length === 0) return;
 
       setSending(true);
@@ -157,7 +160,7 @@ export function useSessionStream(
       });
 
       try {
-        const res = await api.streamMessage(session.id, content, locale, toolResponses, mode, images);
+        const res = await api.streamMessage(session.id, content, locale, toolResponses, mode, images, tier);
         if (!res.ok && res.status !== 200) {
           const text = await res.text();
           throw new Error(`HTTP ${res.status}: ${text}`);

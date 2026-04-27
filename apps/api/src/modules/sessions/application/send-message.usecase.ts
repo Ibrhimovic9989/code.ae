@@ -38,6 +38,12 @@ export class SendMessageUseCase {
   private readonly endpoint: string;
   private readonly apiKey: string;
   private readonly deployment: string;
+  /**
+   * Pro-tier deployment, opt-in per request via the `tier: 'smart'` body
+   * field. Falls back to the default deployment when not configured so we
+   * never have to special-case dev environments without the second model.
+   */
+  private readonly deploymentPro: string;
   private readonly apiVersion: string;
   private readonly maxTurns = 20;
 
@@ -53,6 +59,8 @@ export class SendMessageUseCase {
     this.endpoint = config.get('AZURE_OPENAI_ENDPOINT', { infer: true });
     this.apiKey = config.get('AZURE_OPENAI_API_KEY', { infer: true });
     this.deployment = config.get('AZURE_OPENAI_DEPLOYMENT', { infer: true });
+    this.deploymentPro =
+      config.get('AZURE_OPENAI_DEPLOYMENT_PRO', { infer: true }) ?? this.deployment;
     this.apiVersion = config.get('AZURE_OPENAI_API_VERSION', { infer: true });
   }
 
@@ -69,6 +77,13 @@ export class SendMessageUseCase {
      * reload won't have them.
      */
     images: string[] = [],
+    /**
+     * User-selected tier. 'smart' opts into the larger model meant for
+     * complex tasks; default 'standard' uses the fast everyday model. Names
+     * are deliberately neutral — never expose underlying model names to the
+     * UI or DB.
+     */
+    tier: 'standard' | 'smart' = 'standard',
   ): AsyncGenerator<SessionStreamEvent> {
     if (!userContent.trim() && toolResponses.length === 0) {
       throw new ValidationError('Either message content or tool responses required');
@@ -117,7 +132,7 @@ export class SendMessageUseCase {
     const provider = new AzureOpenAIProvider({
       endpoint: this.endpoint,
       apiKey: this.apiKey,
-      deployment: this.deployment,
+      deployment: tier === 'smart' ? this.deploymentPro : this.deployment,
       apiVersion: this.apiVersion,
     });
     const runner = new CodeAeAgentRunner(provider, {

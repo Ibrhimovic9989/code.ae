@@ -291,6 +291,7 @@ class ApiClient {
     toolResponses?: Array<{ id: string; content: unknown }>,
     mode?: 'plan' | 'build',
     images?: string[],
+    tier?: 'standard' | 'smart',
   ): Promise<Response> {
     return fetch(`${API_URL}/sessions/${sessionId}/messages`, {
       method: 'POST',
@@ -305,6 +306,7 @@ class ApiClient {
         ...(mode ? { mode } : {}),
         ...(toolResponses && toolResponses.length > 0 ? { toolResponses } : {}),
         ...(images && images.length > 0 ? { images } : {}),
+        ...(tier ? { tier } : {}),
       }),
     });
   }
