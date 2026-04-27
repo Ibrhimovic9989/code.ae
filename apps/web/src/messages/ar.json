@@ -51,9 +51,8 @@
       "public": "عام"
     },
     "templates": {
-      "next-nest-monorepo": "Next.js + NestJS (موصى به)",
-      "next-only": "Next.js فقط",
-      "nest-only": "NestJS فقط",
+      "web-app": "تطبيق ويب (موصى به)",
+      "web-app-with-api": "تطبيق ويب + API",
       "blank": "فارغ"
     },
     "create": "إنشاء",

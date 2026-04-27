@@ -223,12 +223,25 @@ export class SendMessageUseCase {
 
     const projectObj = project.toObject();
 
+    // Surface the project's template hint to the agent — but treat it as
+    // intent-based (web-app / web-app-with-api / blank), not a stack
+    // lock-in. The agent's stack-selection rules in the system prompt
+    // pick Vite vs Next regardless. Legacy stack-coded values are mapped
+    // to "web-app-with-api" so old projects keep working.
+    const rawTemplate = projectObj.template;
+    const templateHint =
+      rawTemplate === 'web-app' ||
+      rawTemplate === 'web-app-with-api' ||
+      rawTemplate === 'blank'
+        ? rawTemplate
+        : 'web-app-with-api';
+
     const systemPrompt = buildSystemPrompt({
       projectName: project.slug,
-      projectTemplate: 'next-nest-monorepo',
+      projectTemplate: templateHint,
       userLocale,
-      hasBackend: true,
-      hasFrontend: true,
+      hasBackend: templateHint !== 'blank',
+      hasFrontend: templateHint !== 'blank',
       supabaseLinked: Boolean(projectObj.supabaseProjectRef),
       mode,
     });

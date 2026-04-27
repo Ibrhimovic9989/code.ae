@@ -51,9 +51,8 @@
       "public": "Public"
     },
     "templates": {
-      "next-nest-monorepo": "Next.js + NestJS (recommended)",
-      "next-only": "Next.js only",
-      "nest-only": "NestJS only",
+      "web-app": "Web app (recommended)",
+      "web-app-with-api": "Web app + API",
       "blank": "Blank"
     },
     "create": "Create",

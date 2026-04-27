@@ -186,7 +186,7 @@ function CreateProjectForm({ onDone }: { onDone: (p: Project | null) => void }) 
   const [name, setName] = useState('');
   const [slug, setSlug] = useState('');
   const [description, setDescription] = useState('');
-  const [template, setTemplate] = useState('next-nest-monorepo');
+  const [template, setTemplate] = useState('web-app');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -240,9 +240,10 @@ function CreateProjectForm({ onDone }: { onDone: (p: Project | null) => void }) 
           onChange={(e) => setTemplate(e.target.value)}
           className="mt-1.5 block h-10 w-full rounded-md border border-white/10 bg-white/[0.02] px-3 text-[13.5px] text-neutral-100 focus:border-white/30 focus:bg-white/[0.04] focus:outline-none"
         >
-          <option value="next-nest-monorepo">{t('dashboard.templates.next-nest-monorepo')}</option>
-          <option value="next-only">{t('dashboard.templates.next-only')}</option>
-          <option value="nest-only">{t('dashboard.templates.nest-only')}</option>
+          {/* Intent-based options — the agent picks the actual stack
+              (Vite, Next, etc.) based on what the user describes. */}
+          <option value="web-app">{t('dashboard.templates.web-app')}</option>
+          <option value="web-app-with-api">{t('dashboard.templates.web-app-with-api')}</option>
           <option value="blank">{t('dashboard.templates.blank')}</option>
         </select>
       </div>
