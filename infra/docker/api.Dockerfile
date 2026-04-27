@@ -17,10 +17,16 @@ RUN pnpm install --frozen-lockfile --filter @code-ae/api...
 FROM deps AS build
 COPY packages packages
 COPY apps/api apps/api
-# Build workspace dependencies BEFORE the api. @code-ae/shared and
-# @code-ae/agent-runtime are TypeScript packages whose `dist/` must exist
-# for the api's tsc to resolve imports like `from '@code-ae/shared'`.
-RUN pnpm -r --filter @code-ae/shared --filter @code-ae/agent-runtime --filter @code-ae/templates --filter @code-ae/mcp-client run build || true
+# Build workspace dependencies BEFORE the api in dependency order.
+# @code-ae/shared MUST build first since the others import it. We
+# previously had `|| true` on a single combined run, which silently
+# masked a failure in any of these — the api's tsc then 5-error'd
+# with "Cannot find module '@code-ae/agent-runtime'". Now each
+# workspace package builds explicitly; any failure surfaces here.
+RUN pnpm --filter @code-ae/shared run build
+RUN pnpm --filter @code-ae/agent-runtime run build
+RUN pnpm --filter @code-ae/templates run build
+RUN pnpm --filter @code-ae/mcp-client run build
 RUN pnpm --filter @code-ae/api exec prisma generate
 RUN pnpm --filter @code-ae/api build
 
